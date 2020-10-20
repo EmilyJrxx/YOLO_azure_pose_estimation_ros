@@ -100,7 +100,7 @@ namespace yolo
             }
             void LoadClassNames(const string classesFile);
             vector<string> getOutPutNames(const Net& net);
-            int detect(vector<Mat> outs, const int inpWidth, const int inpHeight);
+            int detect(vector<Mat>& outs, const int inpWidth, const int inpHeight);
             int postprocess(const vector<Mat> outs, const double confThreshold,
                 const double nmsThreshold); // draw bounding box and display, and get final output
             int display();
@@ -109,6 +109,8 @@ namespace yolo
             void TransferResults(vector<Rect>& boxes_out, vector<int>& classIds_out, 
                                  vector<int>& indices_out, vector<float>& confidences_out,
                                  vector<string>& names_out);
+            void TransferResults(vector<Rect>& boxes_out, vector<int>& classIds_out, 
+                                 vector<int>& indices_out);
     };
     void YOLODetector::LoadClassNames(const string classesFile)
     {
@@ -134,7 +136,7 @@ namespace yolo
         }
         return names;                
     }
-    int YOLODetector::detect(vector<Mat> outs, const int inpWidth, const int inpHeight){
+    int YOLODetector::detect(vector<Mat>& outs, const int inpWidth, const int inpHeight){
         // Input: RGB & depth images
         // Output: outs
         // Pre-check
@@ -148,13 +150,16 @@ namespace yolo
         Mat rgb   = rgb_img;
         Mat depth = depth_img;
         Mat blob, frame;
+        // cout << "rgb: " << rgb.size << endl; // debug
         blobFromImage(rgb, blob, 1/255.0, Size(inpWidth, inpHeight),
             Scalar(0, 0, 0), true, false);
         
         // Core Procedure
         net.setInput(blob);
+        // cout << "blob: " << blob.size << endl; // debug
         net.forward(outs, getOutPutNames(net));
-        
+        // cout << "outs: " << outs.size() << endl; // debug
+
         // Efficiency Estimation
         vector<double> layerTime;
         double freq = getTickFrequency() / 1000; // seconds
@@ -170,12 +175,12 @@ namespace yolo
         // Input: outs (frames outputed from net model)
         // Output: classIds, confidences, boundingboxes
         if (if_detected == false){
-            printf("PostProcessError: Not detected yet");
+            printf("PostProcessError: Not detected yet\n");
             return 2;
         }
         if (outs.size() == 0)
         {
-            printf("PostProcessError: None object detected");
+            printf("PostProcessError: None object detected\n");
             return 1;
         }
         cout << "Postprocess: pre-check." << endl; // debug
@@ -229,7 +234,7 @@ namespace yolo
     int YOLODetector::display(){
         // Pre-Check
         if (if_postprocessed == false){
-            printf("DisplayError: Not postprocessed yet");
+            printf("DisplayError: Not postprocessed yet\n");
             return 2;
         }
         vector<int> indi = indices;
@@ -278,5 +283,12 @@ namespace yolo
         {
             names_out.push_back(class_labels[classIds[i]]);
         }
+    }
+    void YOLODetector::TransferResults(vector<Rect>& boxes_out, vector<int>& classIds_out,
+         vector<int>& indices_out)
+    {
+        boxes_out = boxes;
+        classIds_out = classIds;
+        indices_out =  indices;
     }
 }

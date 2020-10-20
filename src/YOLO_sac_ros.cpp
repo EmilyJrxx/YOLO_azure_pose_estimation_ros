@@ -21,6 +21,7 @@
 # include <pcl_conversions/pcl_conversions.h>
 # include <pcl/filters/filter.h>
 # include <pcl/filters/passthrough.h>
+# include <pcl/filters/extract_indices.h>
 # include <pcl/sample_consensus/method_types.h>
 # include <pcl/sample_consensus/model_types.h>
 # include <pcl/segmentation/sac_segmentation.h>
@@ -62,8 +63,12 @@ double relativeDistanceStep = 0.05;
 yolo::YOLODetector yolo_detector (modelConfiguration, modelWeights);
 ppf::CloudProcessor ppf_processor (relativeSamplingStep, relativeDistanceStep);
 
-string demand_object_name;
+string demand_object_name = "bottle";
 
+typedef PointXYZ PointT;
+
+// void posePublish (ModelCoefficients cylinder_coeff)
+// {}
 void Callback(const sensor_msgs::Image::ConstPtr & rgb, 
               const sensor_msgs::Image::ConstPtr & depth,
              const sensor_msgs::PointCloud2::ConstPtr & cloud,
@@ -145,6 +150,7 @@ void Callback(const sensor_msgs::Image::ConstPtr & rgb,
     vector<Rect>bboxes_2d_maxconf; bboxes_2d_maxconf.push_back(bboxes_2d_ppf[max_ind]);
     vector<int>classIds_maxconf; classIds_maxconf.push_back(classIds_ppf[max_ind]);
     vector<int>indices_maxconf; indices_maxconf.push_back(indices_ppf[max_ind]);
+    // single object selected
 
     PointCloud<PointXYZ>::Ptr scene (new PointCloud<PointXYZ>);
     copyPointCloud(*cloud_filtered, *scene);
@@ -153,9 +159,109 @@ void Callback(const sensor_msgs::Image::ConstPtr & rgb,
     ppf_processor.SceneCropping(CameraInfo);
     ppf_processor.Subsampling(0.005f);
     ppf_processor.OutlierProcessing(50, 1.2);
-    vector<PointCloud<PointNormal>> object_with_normals;
-    object_with_normals = ppf_processor.NormalEstimation(50);
+    vector<PointCloud<PointNormal>> objects_with_normals;
+    objects_with_normals = ppf_processor.NormalEstimation(50);
 
-    //
+    // default: only one object after cropping
+    PointCloud<PointXYZ>::Ptr object (new PointCloud<PointXYZ>);
+    PointCloud<Normal>::Ptr normals (new PointCloud<Normal>); 
+    copyPointCloud(objects_with_normals[0], *object);
+    copyPointCloud(objects_with_normals[0], *normals);
 
+    // SAC segmentation with:
+    // 1. surface normals
+    // 2. filtered point clouds
+    SACSegmentationFromNormals<PointT, Normal> seg;
+    ExtractIndices<PointT> indi_extract;
+    ExtractIndices<Normal> indi_extract_normal;
+
+    // First remove planar parts
+    seg.setOptimizeCoefficients (true);
+    seg.setModelType (SACMODEL_NORMAL_PLANE);
+    seg.setNormalDistanceWeight(0.1);
+    seg.setMethodType (SAC_RANSAC);
+    seg.setMaxIterations(100);
+    seg.setDistanceThreshold(0.03);
+    seg.setInputCloud(object);
+    seg.setInputNormals(normals);
+    PointIndices::Ptr inliers_plane (new PointIndices);    
+    ModelCoefficients::Ptr coefficients_plane (new ModelCoefficients);
+    seg.segment(*inliers_plane, *coefficients_plane);
+    cerr << "Plane coefficients: " << *coefficients_plane << endl;
+
+    indi_extract.setInputCloud (object);
+    indi_extract.setIndices (inliers_plane);
+    indi_extract.setNegative (true);
+    indi_extract_normal.setInputCloud (normals);
+    indi_extract_normal.setIndices (inliers_plane);
+    indi_extract_normal.setNegative (true);
+    PointCloud<PointXYZ>::Ptr object_plane_removed (new PointCloud<PointXYZ>);
+    PointCloud<Normal>::Ptr normals_plane_removed (new PointCloud<Normal>);
+    indi_extract.filter (*object_plane_removed);
+    indi_extract_normal.filter (*normals_plane_removed);
+
+    // Match with Cylinder parts
+    seg.setOptimizeCoefficients (true);
+    seg.setModelType (SACMODEL_CYLINDER);
+    seg.setNormalDistanceWeight(0.1);
+    seg.setMethodType (SAC_RANSAC);
+    seg.setMaxIterations(10000);
+    seg.setDistanceThreshold(0.05);
+    seg.setRadiusLimits(0, 0.1);
+    seg.setInputCloud (object_plane_removed);
+    seg.setInputNormals (normals_plane_removed);
+    PointIndices::Ptr inliers_cylinder (new PointIndices);    
+    ModelCoefficients::Ptr coefficients_cylinder (new ModelCoefficients);   
+    seg.segment (*inliers_cylinder, *coefficients_cylinder);
+    cerr << "Cylinder coefficients: " << coefficients_cylinder->header << endl;
+
+    indi_extract.setInputCloud (object_plane_removed);
+    indi_extract.setIndices (inliers_cylinder);
+    indi_extract.setNegative (false);
+    indi_extract_normal.setInputCloud (normals_plane_removed);
+    indi_extract_normal.setIndices (inliers_cylinder);
+    indi_extract_normal.setNegative (false);
+    PointCloud<PointXYZ>::Ptr object_cylinder (new PointCloud<PointXYZ>);
+    PointCloud<Normal>::Ptr normals_cylinder (new PointCloud<Normal>);
+    indi_extract.filter (*object_cylinder);
+
+    float x = coefficients_cylinder->values[0];
+    float y = coefficients_cylinder->values[1];
+    float z = coefficients_cylinder->values[2];
+    float ax = coefficients_cylinder->values[3];
+    float ay = coefficients_cylinder->values[4];
+    float az = coefficients_cylinder->values[5];
+
+    if (object_cylinder->points.empty())
+        cerr << "Can't find the cylindrical component. " << endl;
+    else
+    {
+        std::cerr << "PointCloud representing the cylindrical component: " 
+                  << object_cylinder->size () << " data points." << endl;
+        cerr << "Cylinder coefficients: " << coefficients_cylinder->header << endl;
+    }
+    
+    // posePublish (*coefficients_cylinder);
+}
+int main (int argc, char** argv)
+{
+    // YOLO global configuration
+    yolo_detector.LoadClassNames (classesFile);
+    // PPF global configuration
+
+    // ROS init and configuration
+    ros::init(argc, argv, "Azure_YOLO_SAC");
+    ros::NodeHandle nh;
+    message_filters::Subscriber<sensor_msgs::Image> rgb_sub(nh, rgb_topic, 3);
+    message_filters::Subscriber<sensor_msgs::Image> depth_sub(nh, depth_topic, 3);
+    message_filters::Subscriber<sensor_msgs::PointCloud2> cloud_sub(nh, cloud_topic, 5);
+    message_filters::Subscriber<sensor_msgs::CameraInfo> info_sub (nh, info_topic, 3);
+    typedef sync_policies::ApproximateTime<Image, Image, PointCloud2, CameraInfo> MySyncPolicy;
+    Synchronizer<MySyncPolicy> sync(MySyncPolicy(10), rgb_sub, depth_sub, cloud_sub, info_sub);
+    cout << "Subscriber Configured" << endl;
+
+    sync.registerCallback(boost::bind(&Callback, _1, _2, _3, _4));
+
+    ros::spin();
+    return 0;
 }

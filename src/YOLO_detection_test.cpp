@@ -63,17 +63,19 @@ void Callback(const sensor_msgs::Image::ConstPtr & rgb,
     }
     Mat rgb_frame = rgb_ptr->image;
     Mat depth_frame = depth_ptr->image;
-    // cout << "Images received" << endl; // debug
+    cout << "Images received: " << endl; // debug
+    // cout << rgb_frame.size << endl; // debug
+    // cout << depth_frame.size << endl; // debug
     detector.reloadImages(rgb_frame, depth_frame);
     // Detection
     vector<Mat> outs;
     // Detect
     detector.detect(outs, inpWidth, inpHeight); 
-    // Postprocess
+    // cout << "outs: " << outs.size() << endl;
+    // // Postprocess
     detector.postprocess(outs, confThreshold, nmsThreshold);
-    // Display
+    // // Display
     detector.display();
-
     // Cloud Cropping
 }
 int main(int argc, char** argv)

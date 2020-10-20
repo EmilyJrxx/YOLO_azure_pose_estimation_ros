@@ -8,7 +8,6 @@ project(azure_kinect_test)
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 
-set(CMAKE_PREFIX_PATH /usr/local/include/)
 find_package(catkin REQUIRED COMPONENTS
   cv_bridge
   message_filters
@@ -160,11 +159,14 @@ add_executable(${PROJECT_NAME}_k4a_record
 add_executable(${PROJECT_NAME}_YOLO_PPF_recognition
   src/YOLO_PPF_ros_v2.cpp
 )
+add_executable(${PROJECT_NAME}_YOLO_SAC
+  src/YOLO_sac_ros.cpp
+)
 target_compile_features(${PROJECT_NAME}_k4a_test PUBLIC cxx_std_17)
 target_compile_features(${PROJECT_NAME}_YOLO_test PUBLIC cxx_std_17)
 target_compile_features(${PROJECT_NAME}_k4a_record PUBLIC cxx_std_17)
 target_compile_features(${PROJECT_NAME}_YOLO_PPF_recognition PUBLIC cxx_std_17)
-
+target_compile_features(${PROJECT_NAME}_YOLO_PPF_recognition PUBLIC cxx_std_17)
 add_library(${PROJECT_NAME}_k4a_test_let
   src/k4a_test_ros.cpp
 )
@@ -176,6 +178,9 @@ add_library(${PROJECT_NAME}_k4a_record_let
 )
 add_library(${PROJECT_NAME}_YOLO_PPF_recognition_let
   src/YOLO_PPF_ros_v2.cpp
+)
+add_library(${PROJECT_NAME}_YOLO_SAC_let
+  src/YOLO_sac_ros.cpp
 )
 target_link_libraries(${PROJECT_NAME}_k4a_test
   ${catkin_LIBRARIES}
@@ -217,6 +222,20 @@ target_link_libraries(${PROJECT_NAME}_YOLO_PPF_recognition
   ${PCL_LIBRARIES}
 )
 target_link_libraries(${PROJECT_NAME}_YOLO_PPF_recognition_let
+  ${catkin_LIBRARIES}
+  # ${Eigen3_LIBRARIES}
+  ${OpenCV_LIBRARIES}
+  ${Boost_LIBRARIES}
+  ${PCL_LIBRARIES}
+)
+target_link_libraries(${PROJECT_NAME}_YOLO_SAC
+  ${catkin_LIBRARIES}
+  # ${Eigen3_LIBRARIES}
+  ${OpenCV_LIBRARIES}
+  ${Boost_LIBRARIES}
+  ${PCL_LIBRARIES}
+)
+target_link_libraries(${PROJECT_NAME}_YOLO_SAC_let
   ${catkin_LIBRARIES}
   # ${Eigen3_LIBRARIES}
   ${OpenCV_LIBRARIES}
