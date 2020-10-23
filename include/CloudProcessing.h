@@ -302,10 +302,10 @@ namespace ppf
 
             // double z_c = (left_top.z + left_bot.z + right_top.z + right_bot.z) / 4;
             // z_c = z_c + 0.2; // add diameter of model
-            left_top.z  += 0.15;
-            left_bot.z  += 0.15;
-            right_top.z += 0.15;
-            right_bot.z += 0.15;
+            left_top.z  += 0.4;
+            left_bot.z  += 0.4;
+            right_top.z += 0.4;
+            right_bot.z += 0.4;
 
             // double z_f = z_c - 2 * 0.2; if (z_f < 0) z_f = 0;
             // PointXYZ left_top_front = left_top; left_top_front.z = z_f;
@@ -340,6 +340,7 @@ namespace ppf
             bb_filter.setHullCloud(surface_hull);
             bb_filter.filter(*cropped);
 
+            io::savePLYFileASCII("surface_hull.ply", *surface_hull);
             printf("Cropping : %d / %d \n", scene_tmp->size(), cropped->size());
             objects.push_back(*cropped);
         }

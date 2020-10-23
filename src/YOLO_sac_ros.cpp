@@ -67,8 +67,13 @@ string demand_object_name = "bottle";
 
 typedef PointXYZ PointT;
 
-// void posePublish (ModelCoefficients cylinder_coeff)
-// {}
+void posePublish (ModelCoefficients cylinder_coeff)
+{
+    
+}
+
+Mat CameraInfo_mat;
+
 void Callback(const sensor_msgs::Image::ConstPtr & rgb, 
               const sensor_msgs::Image::ConstPtr & depth,
              const sensor_msgs::PointCloud2::ConstPtr & cloud,
@@ -95,6 +100,8 @@ void Callback(const sensor_msgs::Image::ConstPtr & rgb,
 
     Mat rgb_frame = rgb_ptr->image;
     Mat depth_frame = depth_ptr->image;
+
+    // imwrite("rgb.jpg", rgb_frame); // debug
     int tick2 = getTickCount();
 
     tick1 = getTickCount();
@@ -105,7 +112,9 @@ void Callback(const sensor_msgs::Image::ConstPtr & rgb,
     PointCloud<PointXYZRGB>::Ptr cloud_filtered (new PointCloud<PointXYZRGB>);
     vector<int> indices;
     pcl::removeNaNFromPointCloud(*pcl_cloud, *cloud_filtered, indices);
-    Mat CameraInfo(3, 3, CV_32F, (void*)info->K.data());
+    // io::savePLYFileASCII("scene_cloud.ply", *cloud_filtered); // debug
+    // Mat CameraInfo(3, 3, CV_32F, (void*)info->K.data()); 
+    // cout << "Camera info: " << CameraInfo << endl;
     tick2 = getTickCount();
     cout << "Message Receiving: " 
          << (tick2 - tick1)/getTickFrequency() << "sec.\n";
@@ -133,6 +142,7 @@ void Callback(const sensor_msgs::Image::ConstPtr & rgb,
     vector<int> demanded_objects;
     for(int i = 0; i < names_out.size(); i++)
     {
+        cout << "name: " << names_out[i] << endl; // debug
         if (names_out[i] == demand_object_name)
         {
             demanded_objects.push_back(i);
@@ -141,6 +151,7 @@ void Callback(const sensor_msgs::Image::ConstPtr & rgb,
     float max_conf = 0; int max_ind = 0;
     for(int i = 0; i < demanded_objects.size(); i++)
     {
+        cout << "confidence: " << conf_out[i] << endl; // debug
         if (conf_out[demanded_objects[i]] > max_conf)
         {
             max_conf = conf_out[demanded_objects[i]];
@@ -156,8 +167,8 @@ void Callback(const sensor_msgs::Image::ConstPtr & rgb,
     copyPointCloud(*cloud_filtered, *scene);
     ppf_processor.ReloadScenes(scene, depth_frame, 
                             bboxes_2d_maxconf, classIds_maxconf, indices_maxconf);
-    ppf_processor.SceneCropping(CameraInfo);
-    ppf_processor.Subsampling(0.005f);
+    ppf_processor.SceneCropping(CameraInfo_mat);
+    ppf_processor.Subsampling(0.002f);
     ppf_processor.OutlierProcessing(50, 1.2);
     vector<PointCloud<PointNormal>> objects_with_normals;
     objects_with_normals = ppf_processor.NormalEstimation(50);
@@ -187,7 +198,6 @@ void Callback(const sensor_msgs::Image::ConstPtr & rgb,
     PointIndices::Ptr inliers_plane (new PointIndices);    
     ModelCoefficients::Ptr coefficients_plane (new ModelCoefficients);
     seg.segment(*inliers_plane, *coefficients_plane);
-    cerr << "Plane coefficients: " << *coefficients_plane << endl;
 
     indi_extract.setInputCloud (object);
     indi_extract.setIndices (inliers_plane);
@@ -245,6 +255,13 @@ void Callback(const sensor_msgs::Image::ConstPtr & rgb,
 }
 int main (int argc, char** argv)
 {
+    // Camera Parameters
+    Eigen::MatrixXd CameraIntr_tmp(3, 3);
+    CameraIntr_tmp << 983.0159, 0.0, 1021.2937,
+                  0.0, 982.9841, 774.7237,
+                  0.0, 0.0, 1.0;
+    // Mat CameraIntr;
+    eigen2cv(CameraIntr_tmp, CameraInfo_mat);
     // YOLO global configuration
     yolo_detector.LoadClassNames (classesFile);
     // PPF global configuration
