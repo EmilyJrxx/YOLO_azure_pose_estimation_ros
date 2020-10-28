@@ -102,23 +102,17 @@ class aubo_vision_pick(object):
         default_joint_states = group.get_current_joint_values()
         print(type(default_joint_states), default_joint_states)
 
-        # define ready pose with specific joint value
-        # default_joint_states[0] = 2.39   / 180 * math.pi
-        # default_joint_states[1] = 28.69 / 180 * math.pi
-        # default_joint_states[2] = -124.72 / 180 * math.pi
-        # default_joint_states[3] = -63.47  / 180 * math.pi
-        # default_joint_states[4] = -88.21 / 180 * math.pi
-        # default_joint_states[5] = 1.7620   / 180 * math.pi
-        
         ready_pose=geometry_msgs.msg.Pose()
         ready_pose.position.x = -0.4612
         ready_pose.position.y = -0.1438
-        ready_pose.position.z = 0.635
+        # fixed value! DO NOT CHANGE! 
+ #################################################### 
+        ready_pose.position.z = 0.635 
         ready_pose.orientation.x = 0.7109
         ready_pose.orientation.y = -0.7031
         ready_pose.orientation.z = 0.0
         ready_pose.orientation.w = 0.0
-
+#####################################################
         group.set_pose_target(ready_pose)
         group.go(wait=True)
         # group.stop()
@@ -131,7 +125,6 @@ class aubo_vision_pick(object):
     def lift_up(self):
         group = self.group
         current_pose = group.get_current_pose().pose
-        # print("Current pose: ", current_pose)
         pose_goal=geometry_msgs.msg.Pose()
 
         # define pose with specific parameters
@@ -146,10 +139,10 @@ class aubo_vision_pick(object):
         print("New current pose: ", current_pose)
         return all_close(pose_goal, current_pose, 0.01)
 
+        # Similar to <lift_up>
     def put_down(self):
         group = self.group
         current_pose = group.get_current_pose().pose
-        # print("Current pose: ", current_pose)
         pose_goal=geometry_msgs.msg.Pose()
 
         # define pose with specific parameters
@@ -163,16 +156,17 @@ class aubo_vision_pick(object):
         current_pose=group.get_current_pose().pose
         print("New current pose: ", current_pose)
         return all_close(pose_goal, current_pose, 0.01)
+        
 
+        # Similar to <lift_up>
     def goto_next(self, scale):
         group = self.group
         current_pose = group.get_current_pose().pose
-        # print("Current pose: ", current_pose)
         pose_goal=geometry_msgs.msg.Pose()
 
         # define pose with specific parameters
         pose_goal = current_pose
-        pose_goal.position.y += scale * 0.075
+        pose_goal.position.y += 0.1*scale
         
         group.set_pose_target(pose_goal)
         plan = group.go(wait=True)
@@ -182,7 +176,8 @@ class aubo_vision_pick(object):
         print("New current pose: ", current_pose)
         return all_close(pose_goal, current_pose, 0.01)
 
-    def write_F(self, scale):
+        #change of position.z should be fixed as 0.03
+    def write_W(self, scale):
         waypoints = []
 
         group = self.group
@@ -194,97 +189,49 @@ class aubo_vision_pick(object):
         wpose = group.get_current_pose().pose
         wpose.position.y += scale * 0.05
         waypoints.append(copy.deepcopy(wpose))
-        wpose.position.z += 0.03
+        wpose.position.x += scale *0.025
+        waypoints.append(copy.deepcopy(wpose))
+        wpose.position.y -= scale *0.05
+        waypoints.append(copy.deepcopy(wpose))        
+        wpose.position.x -= scale *0.025
         waypoints.append(copy.deepcopy(wpose))
         
         # the second stroke
-        wpose.position.z -= 0.03
-        wpose.position.y -= scale * 0.05
-        waypoints.append(copy.deepcopy(wpose))
-        wpose.position.x += scale * 0.1
-        waypoints.append(copy.deepcopy(wpose))
         wpose.position.z += 0.03
+        wpose.position.x += scale * 0.0375
         waypoints.append(copy.deepcopy(wpose))
+        wpose.position.z -= 0.03
+        waypoints.append(copy.deepcopy(wpose))
+        wpose.position.y += scale * 0.05
+        waypoints.append(copy.deepcopy(wpose))
+
         
         # the third stroke
-        wpose.position.z -= 0.03
-        wpose.position.x -= scale * 0.05
-        waypoints.append(copy.deepcopy(wpose))
-        wpose.position.y += scale * 0.05
-        waypoints.append(copy.deepcopy(wpose))
-        # wpose.position.z += 0.03
-        # waypoints.append(copy.deepcopy(wpose))
-
-        (plan, fraction) = group.compute_cartesian_path(
-            waypoints,
-            0.01,
-            0.0
-        )
-        group.execute(plan, wait=True)
-
-        group.clear_pose_targets()
-        current_pose=group.get_current_pose().pose
-        print("New current pose: ", current_pose)
-
-        group.set_pose_target(start_pose)
-        group.go(wait=True)
-        group.clear_pose_targets()
-        current_pose=group.get_current_pose().pose
-        print("New current pose: ", current_pose)
-
-    def write_U(self, scale):
-        waypoints = []
-
-        group = self.group
-        start_pose = group.get_current_pose().pose
-        print("Current pose: ", start_pose)
-
-        self.put_down()
-
-        wpose = group.get_current_pose().pose
-        wpose.position.x += scale * 0.1
-        waypoints.append(copy.deepcopy(wpose))
-        wpose.position.y += scale * 0.05
-        waypoints.append(copy.deepcopy(wpose))
-        wpose.position.x -= scale * 0.1
-        waypoints.append(copy.deepcopy(wpose))
-
-        (plan, fraction) = group.compute_cartesian_path(
-            waypoints,
-            0.01,
-            0.0
-        )
-        group.execute(plan, wait=True)
-
-        group.clear_pose_targets()
-        current_pose=group.get_current_pose().pose
-        print("New current pose: ", current_pose)
-
-        group.set_pose_target(start_pose)
-        group.go(wait=True)
-        group.clear_pose_targets()
-        current_pose=group.get_current_pose().pose
-        print("New current pose: ", current_pose)
-
-    def write_D(self, scale):
-        waypoints = []
-
-        group = self.group
-        start_pose = group.get_current_pose().pose
-        print("Current pose: ", start_pose)
-
-        self.put_down()
-
-        wpose = group.get_current_pose().pose
-        wpose.position.x += scale * 0.10
-        waypoints.append(copy.deepcopy(wpose))
-        wpose.position.x -= scale * 0.025
-        wpose.position.y += scale * 0.05
-        waypoints.append(copy.deepcopy(wpose))
-        wpose.position.x -= scale * 0.05
-        waypoints.append(copy.deepcopy(wpose))
-        wpose.position.x -= scale * 0.025
+        wpose.position.z += 0.03
         wpose.position.y -= scale * 0.05
+        wpose.position.x += scale * 0.0125
+        waypoints.append(copy.deepcopy(wpose))
+        wpose.position.z -= 0.03
+        waypoints.append(copy.deepcopy(wpose))
+        wpose.position.y += scale * 0.05
+        waypoints.append(copy.deepcopy(wpose))
+        wpose.position.z += 0.03
+        wpose.position.y -= scale * 0.025
+        wpose.position.x -= scale * 0.0125
+        waypoints.append(copy.deepcopy(wpose))
+        wpose.position.z -= 0.03
+        waypoints.append(copy.deepcopy(wpose))
+        wpose.position.y -= scale * 0.025
+        wpose.position.x += scale * 0.035
+        waypoints.append(copy.deepcopy(wpose))
+        wpose.position.z += 0.03
+        wpose.position.y += scale * 0.025
+        wpose.position.x -= scale * 0.0225
+        waypoints.append(copy.deepcopy(wpose))
+        wpose.position.z -= 0.03
+        waypoints.append(copy.deepcopy(wpose))
+        wpose.position.y += scale * 0.025
+        wpose.position.x += scale * 0.0225
         waypoints.append(copy.deepcopy(wpose))
 
         (plan, fraction) = group.compute_cartesian_path(
@@ -296,55 +243,82 @@ class aubo_vision_pick(object):
 
         group.clear_pose_targets()
         current_pose=group.get_current_pose().pose
-        print("New current pose: ", current_pose) 
+        print("New current pose: ", current_pose)
 
         group.set_pose_target(start_pose)
         group.go(wait=True)
         group.clear_pose_targets()
         current_pose=group.get_current_pose().pose
-        print("New current pose: ", current_pose) 
+        print("New current pose: ", current_pose)
 
-    def write_A(self, scale):
+    def write_M(self, scale):
+        waypoints = []
+
         group = self.group
         start_pose = group.get_current_pose().pose
         print("Current pose: ", start_pose)
-
-        current_pose = group.get_current_pose().pose
-        pose_goal = geometry_msgs.msg.Pose()
-
-        # define pose with specific parameters
-        pose_goal = current_pose
-        pose_goal.position.x += scale * 0.1
-        
-        group.set_pose_target(pose_goal)
-        plan = group.go(wait=True)
-        # group.stop()
-        group.clear_pose_targets()
-        current_pose=group.get_current_pose().pose
-        print("New current pose: ", current_pose)
-        rospy.sleep(1)
-
-        waypoints = []
 
         self.put_down()
         # the first stroke
         wpose = group.get_current_pose().pose
-        wpose.position.y += scale * 0.025
-        wpose.position.x -= scale * 0.10
+        wpose.position.z += 0.03
+        wpose.position.x += scale *0.035
         waypoints.append(copy.deepcopy(wpose))
-        wpose.position.y += scale * 0.025
-        wpose.position.x += scale * 0.10
+        wpose.position.z -= 0.03
+        waypoints.append(copy.deepcopy(wpose))
+        wpose.position.x += scale *0.025
+        waypoints.append(copy.deepcopy(wpose))        
+        wpose.position.y += scale *0.0125
+        waypoints.append(copy.deepcopy(wpose))
+        wpose.position.x -= scale *0.025
+        waypoints.append(copy.deepcopy(wpose))        
+        wpose.position.y -= scale *0.0125
+        waypoints.append(copy.deepcopy(wpose))
+        
+        # the second stroke
+        wpose.position.z += 0.03
+        wpose.position.x += scale * 0.0125
+        waypoints.append(copy.deepcopy(wpose))
+        wpose.position.z -= 0.03
+        waypoints.append(copy.deepcopy(wpose))
+        wpose.position.y += scale * 0.0125
+        waypoints.append(copy.deepcopy(wpose))
+
+        
+        # the third stroke
+        wpose.position.z += 0.03
+        wpose.position.y += scale * 0.0125
+        wpose.position.x -= scale * 0.0375
+        waypoints.append(copy.deepcopy(wpose))
+        wpose.position.z -= 0.03
+        waypoints.append(copy.deepcopy(wpose))
+        wpose.position.x += scale * 0.075
         waypoints.append(copy.deepcopy(wpose))
         wpose.position.z += 0.03
+        wpose.position.x -= scale * 0.075
         waypoints.append(copy.deepcopy(wpose))
-
-        # the second stroke
         wpose.position.z -= 0.03
+        waypoints.append(copy.deepcopy(wpose))
+        wpose.position.y += scale * 0.0125
+        waypoints.append(copy.deepcopy(wpose))
+        wpose.position.x += scale * 0.075
+        waypoints.append(copy.deepcopy(wpose))
+        wpose.position.z += 0.03
         wpose.position.x -= scale * 0.05
-        wpose.position.y -= scale * 0.0375
         waypoints.append(copy.deepcopy(wpose))
-        wpose.position.y += scale * 0.025
+        wpose.position.z -= 0.03
         waypoints.append(copy.deepcopy(wpose))
+        wpose.position.y -= scale * 0.0125
+        waypoints.append(copy.deepcopy(wpose))
+        wpose.position.z += 0.03
+        wpose.position.x += scale * 0.0125
+        waypoints.append(copy.deepcopy(wpose))
+        wpose.position.z -= 0.03
+        waypoints.append(copy.deepcopy(wpose))
+        wpose.position.y -= scale * 0.0125
+        waypoints.append(copy.deepcopy(wpose))
+
+
 
         (plan, fraction) = group.compute_cartesian_path(
             waypoints,
@@ -362,57 +336,12 @@ class aubo_vision_pick(object):
         group.clear_pose_targets()
         current_pose=group.get_current_pose().pose
         print("New current pose: ", current_pose)
- 
-          
-    def write_N(self, scale):
-        group = self.group
-        start_pose = group.get_current_pose().pose
-        print("Current pose: ", start_pose)
 
-        current_pose = group.get_current_pose().pose
-        pose_goal = geometry_msgs.msg.Pose()
 
-        # define pose with specific parameters
-        pose_goal = current_pose
-        pose_goal.position.x += scale * 0.1
+
+
+
         
-        group.set_pose_target(pose_goal)
-        plan = group.go(wait=True)
-        # group.stop()
-        group.clear_pose_targets()
-        current_pose=group.get_current_pose().pose
-        print("New current pose: ", current_pose)
-        rospy.sleep(1)
-        
-        waypoints = []
-
-        self.put_down()
-
-        wpose = group.get_current_pose().pose
-        wpose.position.x -= scale * 0.10
-        waypoints.append(copy.deepcopy(wpose))
-        wpose.position.x += scale * 0.10
-        wpose.position.y += scale * 0.05
-        waypoints.append(copy.deepcopy(wpose))
-        wpose.position.x -= scale * 0.10
-        waypoints.append(copy.deepcopy(wpose))
-
-        (plan, fraction) = group.compute_cartesian_path(
-            waypoints,
-            0.01,
-            0.0
-        )
-        group.execute(plan, wait=True)
-
-        group.clear_pose_targets()
-        current_pose=group.get_current_pose().pose
-        print("New current pose: ", current_pose) 
-
-        group.set_pose_target(start_pose)
-        group.go(wait=True)
-        group.clear_pose_targets()
-        current_pose=group.get_current_pose().pose
-        print("New current pose: ", current_pose)
 
 
 if __name__=="__main__":
@@ -422,25 +351,13 @@ if __name__=="__main__":
     print "==== Press `Enter` to go to ready pose ===="
     raw_input()
     aubo_move.go_to_ready_pose()
-    # aubo_move.init_2f_gripper()
 
     scale = 0.5
-    print "==== Press `Enter` to write F ===="
-    # raw_input()
-    aubo_move.write_F(scale)
-    print "==== Press `Enter` to write u ===="
+    print "==== Press `Enter` to write W ===="
+    # raw_input() is one way you can test your patterns respectively
+    aubo_move.write_W(scale)
+    print "==== Press `Enter` to write M ===="
     # raw_input()
     aubo_move.goto_next(scale)
     aubo_move.write_U(scale)
-    print "==== Press `Enter` to write D ===="
-    # raw_input()
-    aubo_move.goto_next(scale)
-    aubo_move.write_D(scale)
-    print "==== Press `Enter` to write A ===="
-    # raw_input()
-    aubo_move.goto_next(scale)
-    aubo_move.write_A(scale)
-    print "==== Press `Enter` to write N ===="
-    # raw_input()
-    aubo_move.goto_next(scale)
-    aubo_move.write_N(scale)
+

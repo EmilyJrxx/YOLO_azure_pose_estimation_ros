@@ -118,6 +118,7 @@ namespace ppf
         cout << "Deserializing..." << endl;
         int64 tick1 = cv::getTickCount(); 
         FileStorage fsload(TrainedDetectorFile, FileStorage::READ);
+        cout << "FileStorage Handler initialized. " << endl;
         detectors[id].read(fsload.root());
         fsload.release();
         int64 tick2 = cv::getTickCount();
@@ -285,27 +286,30 @@ namespace ppf
         for (uint32_t i = 0; i < boxes.size(); i++){
             cout << "Processing on " << (i+1) << "th boundingbox." << endl;
 
-            double left   = boxes[i].x - 30; if (left < 0) left = 0;
-            double top    = boxes[i].y - 30; if (top < 0) top = 0;
-            double right  = boxes[i].x + boxes[i].width + 30; if (right >= depth_cols) right = depth_cols - 1; 
-            double bottom = boxes[i].y + boxes[i].height + 30; if (bottom >= depth_rows) bottom = depth_rows - 1;
-            
+            double left   = boxes[i].x - 5; if (left < 0) left = 0;
+            double top    = boxes[i].y - 5; if (top < 0) top = 0;
+            double right  = boxes[i].x + boxes[i].width + 5; if (right >= depth_cols) right = depth_cols - 1; 
+            double bottom = boxes[i].y + boxes[i].height + 5; if (bottom >= depth_rows) bottom = depth_rows - 1;
+            double center_x = boxes[i].x + boxes[i].width / 2; if (center_x >= depth_cols) center_x = depth_cols - 1;
+            double center_y = boxes[i].y + boxes[i].height / 2; if (center_y >= depth_rows) center_y = depth_rows - 1;
+
             float depth_1 = depth.at<float>(top, left);
             float depth_2 = depth.at<float>(top, right);
             float depth_3 = depth.at<float>(bottom, left);
             float depth_4 = depth.at<float>(bottom, right);
             float depth_avg = (depth_1 + depth_2 + depth_3 + depth_4) / 4;
-            PointXYZ left_top  = camera.back_projection_bbox(depth_avg, left, top); // y = top, x = left
-            PointXYZ left_bot  = camera.back_projection_bbox(depth_avg, left, bottom);
-            PointXYZ right_top = camera.back_projection_bbox(depth_avg, right, top);
-            PointXYZ right_bot = camera.back_projection_bbox(depth_avg, right, bottom);
+            float depth_center = depth.at<float>(center_y, center_x);
+            PointXYZ left_top  = camera.back_projection_bbox(depth_center, left, top); // y = top, x = left
+            PointXYZ left_bot  = camera.back_projection_bbox(depth_center, left, bottom);
+            PointXYZ right_top = camera.back_projection_bbox(depth_center, right, top);
+            PointXYZ right_bot = camera.back_projection_bbox(depth_center, right, bottom);
 
             // double z_c = (left_top.z + left_bot.z + right_top.z + right_bot.z) / 4;
             // z_c = z_c + 0.2; // add diameter of model
-            left_top.z  += 0.4;
-            left_bot.z  += 0.4;
-            right_top.z += 0.4;
-            right_bot.z += 0.4;
+            left_top.z  += 0.10;
+            left_bot.z  += 0.10;
+            right_top.z += 0.10;
+            right_bot.z += 0.10;
 
             // double z_f = z_c - 2 * 0.2; if (z_f < 0) z_f = 0;
             // PointXYZ left_top_front = left_top; left_top_front.z = z_f;
@@ -341,6 +345,7 @@ namespace ppf
             bb_filter.filter(*cropped);
 
             io::savePLYFileASCII("surface_hull.ply", *surface_hull);
+            io::savePLYFileASCII("cropped_cloud.ply", *cropped);
             printf("Cropping : %d / %d \n", scene_tmp->size(), cropped->size());
             objects.push_back(*cropped);
         }
@@ -484,7 +489,14 @@ namespace ppf
         cout << endl << "ICP Elapsed Time " <<
             (t2-t1)/cv::getTickFrequency() << " sec" << endl;
         
-        return *resultsSub[0]; // return transformation: model -> scene
+        vector<float> residuals;
+        for (int i = 0; i < N; i++)
+        {
+            residuals.push_back(resultsSub[i]->residual);
+        }
+        vector<float>::iterator min = min_element(residuals.begin(), residuals.end());
+        int min_index = (int)distance(residuals.begin(), min);
+        return *resultsSub[min_index]; // return transformation: model -> scene
         
         // TODO: Pose Validation
     }

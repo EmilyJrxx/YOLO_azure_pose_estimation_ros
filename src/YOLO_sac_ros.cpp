@@ -1,4 +1,5 @@
 # include <ros/ros.h>
+# include <math.h>
 
 # include <message_filters/macros.h>
 # include <message_filters/subscriber.h>
@@ -8,6 +9,7 @@
 # include <sensor_msgs/Image.h>
 # include <sensor_msgs/CameraInfo.h>
 # include <sensor_msgs/PointCloud2.h>
+# include <geometry_msgs/Pose.h>
 # include <std_msgs/Header.h>
 
 # include <Eigen/Core>
@@ -44,6 +46,7 @@ const string rgb_topic = "/rgb/image_raw";
 const string depth_topic = "/depth_to_rgb/image_raw";
 const string cloud_topic = "/points2";
 const string info_topic = "/rgb/camera_info";
+const string pose_topic = "/object_pose";
 const string output_dir = "/home/xxwang/Desktop/Azure_ROS_Recorded/";
 // YOLO parameters
 const int inpHeight = 416;
@@ -67,7 +70,33 @@ string demand_object_name = "bottle";
 
 typedef PointXYZ PointT;
 
-void posePublish (ModelCoefficients cylinder_coeff)
+Eigen::Vector3f initial_direc (0.0, 0.0, 1.0);
+void posePublish (ModelCoefficients cylinder_coeff, ros::Publisher publisher)
+{
+    // publish object pose informs of geometry_msgs pose
+    //     position: x, y, z
+    //     orientation: x, y, z, w
+    // quaternion & angle-axis
+    geometry_msgs::Pose obj_pose;
+    obj_pose.position.x = cylinder_coeff.values[0];
+    obj_pose.position.y = cylinder_coeff.values[1];
+    obj_pose.position.z = cylinder_coeff.values[2];
+    
+    Eigen::Vector3f cylinder_direc (cylinder_coeff.values[3],
+                                    cylinder_coeff.values[4],
+                                    cylinder_coeff.values[5]);
+    Eigen::Vector3f rot_axis = initial_direc.cross(cylinder_direc);
+    float rot_angle = acos(initial_direc.dot(cylinder_direc) / 
+                           (initial_direc.norm() * cylinder_direc.norm()));
+    obj_pose.orientation.x = sin(rot_angle / 2) * rot_axis[0];
+    obj_pose.orientation.y = sin(rot_angle / 2) * rot_axis[1];
+    obj_pose.orientation.z = sin(rot_angle / 2) * rot_axis[2];
+    obj_pose.orientation.w = cos(rot_angle / 2);
+
+    cout << "Publishing! " << endl;
+    publisher.publish(obj_pose);
+}
+PointXYZ cloud_centroid (pcl::PointCloud<PointXYZ>)
 {
     
 }
@@ -77,8 +106,8 @@ Mat CameraInfo_mat;
 void Callback(const sensor_msgs::Image::ConstPtr & rgb, 
               const sensor_msgs::Image::ConstPtr & depth,
              const sensor_msgs::PointCloud2::ConstPtr & cloud,
-              const sensor_msgs::CameraInfo::ConstPtr & info
-              )
+              const sensor_msgs::CameraInfo::ConstPtr & info,
+              ros::Publisher publisher)
 {
     int tick1 = getTickCount();
     cv_bridge::CvImagePtr rgb_ptr;
@@ -112,7 +141,7 @@ void Callback(const sensor_msgs::Image::ConstPtr & rgb,
     PointCloud<PointXYZRGB>::Ptr cloud_filtered (new PointCloud<PointXYZRGB>);
     vector<int> indices;
     pcl::removeNaNFromPointCloud(*pcl_cloud, *cloud_filtered, indices);
-    // io::savePLYFileASCII("scene_cloud.ply", *cloud_filtered); // debug
+    io::savePLYFileASCII("scene_cloud.ply", *cloud_filtered); // debug
     // Mat CameraInfo(3, 3, CV_32F, (void*)info->K.data()); 
     // cout << "Camera info: " << CameraInfo << endl;
     tick2 = getTickCount();
@@ -223,7 +252,7 @@ void Callback(const sensor_msgs::Image::ConstPtr & rgb,
     PointIndices::Ptr inliers_cylinder (new PointIndices);    
     ModelCoefficients::Ptr coefficients_cylinder (new ModelCoefficients);   
     seg.segment (*inliers_cylinder, *coefficients_cylinder);
-    cerr << "Cylinder coefficients: " << coefficients_cylinder->header << endl;
+    cerr << "Cylinder coefficients: " << *coefficients_cylinder << endl;
 
     indi_extract.setInputCloud (object_plane_removed);
     indi_extract.setIndices (inliers_cylinder);
@@ -246,9 +275,10 @@ void Callback(const sensor_msgs::Image::ConstPtr & rgb,
         cerr << "Can't find the cylindrical component. " << endl;
     else
     {
-        std::cerr << "PointCloud representing the cylindrical component: " 
-                  << object_cylinder->size () << " data points." << endl;
-        cerr << "Cylinder coefficients: " << coefficients_cylinder->header << endl;
+        // std::cerr << "PointCloud representing the cylindrical component: " 
+        //           << object_cylinder->size () << " data points." << endl;
+        // cerr << "Cylinder coefficients: " << coefficients_cylinder->header << endl;
+        posePublish (*coefficients_cylinder, publisher);
     }
     
     // posePublish (*coefficients_cylinder);
@@ -276,8 +306,10 @@ int main (int argc, char** argv)
     typedef sync_policies::ApproximateTime<Image, Image, PointCloud2, CameraInfo> MySyncPolicy;
     Synchronizer<MySyncPolicy> sync(MySyncPolicy(10), rgb_sub, depth_sub, cloud_sub, info_sub);
     cout << "Subscriber Configured" << endl;
-
-    sync.registerCallback(boost::bind(&Callback, _1, _2, _3, _4));
+    
+    ros::Publisher pose_pub = nh.advertise<geometry_msgs::Pose>(pose_topic, 10);
+    
+    sync.registerCallback(boost::bind(&Callback, _1, _2, _3, _4, pose_pub));
 
     ros::spin();
     return 0;
