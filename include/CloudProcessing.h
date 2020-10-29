@@ -443,9 +443,10 @@ namespace ppf
     Pose3D CloudProcessor::Matching(const string name, Mat scene, double relativeSceneSampleStep = 0.0714, 
                                   double relativeSceneDistance = 0.05)
     {
+        cout << "detectors num: " << detectors.size() << endl;
         int id = label_to_id[name];
         PPF3DDetector detector = detectors[id];
-        vector<Pose3DPtr> results;
+        vector<Pose3DPtr> results; results.clear();
         // Pre check
         if (!if_trained[id])
         {
@@ -503,9 +504,10 @@ namespace ppf
     Pose3D CloudProcessor::Matching_S2B(const string name, Mat scene, Mat edge, double relativeSceneSampleStep = 0.033, 
                                   double relativeSceneDistance = 0.08)
     {
+        cout << "detectors num: " << detectors.size() << endl;
         int id = label_to_id[name];
         PPF3DDetector detector = detectors[id];
-        vector<Pose3DPtr> results;
+        vector<Pose3DPtr> results; results.clear();
         // Pre check
         if (!if_trained[id])
         {

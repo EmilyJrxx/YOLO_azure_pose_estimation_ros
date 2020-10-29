@@ -41,7 +41,7 @@ const string depth_topic = "/depth_to_rgb/image_raw";
 const string cloud_topic = "/points2";
 const string info_topic = "/rgb/camera_info";
 const string pose_topic = "/ppf_object_pose";
-const string output_dir = "/home/emilyjr/Desktop/Azure_ROS_Recorded/";
+// const string output_dir = "/home/emilyjr/Desktop/Azure_ROS_Recorded/";
 // YOLO parameters
 const int inpHeight = 416;
 const int inpWidth = 416;
@@ -181,7 +181,7 @@ void Callback(const sensor_msgs::Image::ConstPtr & rgb,
     copyPointCloud(*cloud_filtered, *scene);
     ppf_processor.ReloadScenes(scene, depth_frame, bboxes_2d_maxconf, classIds_maxconf, indices_maxconf);
     ppf_processor.SceneCropping(CameraInfo_mat);
-    ppf_processor.Subsampling(0.005f);
+    ppf_processor.Subsampling(0.002f);
     ppf_processor.OutlierProcessing(50, 1.2);
     vector<PointCloud<PointNormal>> objects_with_normals;
     objects_with_normals = ppf_processor.NormalEstimation(50);
@@ -195,12 +195,16 @@ void Callback(const sensor_msgs::Image::ConstPtr & rgb,
     Mat object_wn_mat, edges_wn_mat;
     ppf_processor.PointCloudXYZNormalToMat(object_wn_mat, objects_with_normals[0].makeShared());
     ppf_processor.PointCloudXYZNormalToMat(edges_wn_mat, edges_with_normals[0].makeShared());
-    // Pose3D result_pose = ppf_processor.Matching_S2B("bottle", object_wn_mat, edges_wn_mat);
-    Pose3D result_pose = ppf_processor.Matching("bottle", object_wn_mat);
+    Pose3D result_pose = ppf_processor.Matching_S2B("bottle", object_wn_mat, edges_wn_mat);
+    // Pose3D result_pose = ppf_processor.Matching("bottle", object_wn_mat);
+    Mat object_wn_trans = transformPCPose(object_wn_mat, result_pose.pose.inv());
+    writePLY(object_wn_trans, "trans_object.ply");
     cout << "Result_pose (model -> scene): " << endl;
     result_pose.printPose();
-
+    
     posePublish(result_pose, pose_pub);
+
+    
 }
 int main(int argc, char** argv)
 {
@@ -223,7 +227,7 @@ int main(int argc, char** argv)
     ros::NodeHandle nh;
     message_filters::Subscriber<sensor_msgs::Image> rgb_sub(nh, rgb_topic, 3);
     message_filters::Subscriber<sensor_msgs::Image> depth_sub(nh, depth_topic, 3);
-    message_filters::Subscriber<sensor_msgs::PointCloud2> cloud_sub(nh, cloud_topic, 5);
+    message_filters::Subscriber<sensor_msgs::PointCloud2> cloud_sub(nh, cloud_topic, 3);
     message_filters::Subscriber<sensor_msgs::CameraInfo> info_sub (nh, info_topic, 3);
     typedef sync_policies::ApproximateTime<Image, Image, PointCloud2, CameraInfo> MySyncPolicy;
     Synchronizer<MySyncPolicy> sync(MySyncPolicy(10), rgb_sub, depth_sub, cloud_sub, info_sub);
