@@ -1,5 +1,6 @@
 # include <ros/ros.h>
 # include <math.h>
+# include <malloc.h>
 
 # include <message_filters/macros.h>
 # include <message_filters/subscriber.h>
@@ -50,19 +51,63 @@ const double nmsThreshold = 0.4;
 const string modelConfiguration = "/home/xxwang/Packages/darknet/cfg/yolov3.cfg";
 const string modelWeights = "/home/xxwang/Packages/darknet/yolov3.weights";
 const string classesFile = "/home/xxwang/Packages/darknet/data/coco.names";
-const string modelFile = "/home/xxwang/Workspaces/YOLO_PPF_Pose_Estimation/data/bluemoon_1/or1.2_mls15_meter.ply";
+const string modelFile = "/home/xxwang/Workspaces/YOLO_PPF_Pose_Estimation/data/bluemoon_1/or1.2_mls15_remesh_3.0_meter.ply";
 const string PPFDetectorFile = "/home/xxwang/Workspaces/YOLO_PPF_Pose_Estimation/src/detector_bluemoon_bottle.xml";
+const string TrainedDetectorFile = "/home/xxwang/Workspaces/YOLO_PPF_Pose_Estimation/src/detector_bluemoon_bottle_remesh.xml";
 // PPF parameters
 double relativeSamplingStep = 0.025;
 double relativeDistanceStep = 0.05;
 // Camera Parameters
 // Detectors Announcement
 yolo::YOLODetector yolo_detector (modelConfiguration, modelWeights);
-ppf::CloudProcessor ppf_processor (relativeSamplingStep, relativeDistanceStep); // here in the constructor the detector is not initialized
+ppf::CloudProcessor ppf_processor (relativeSamplingStep, relativeDistanceStep);
 
 string demand_object_name = "bottle";
 Mat CameraInfo_mat;
+// global hash_table
+int default_hashtable_size = 100000;
+hashtable_int *_hash_table = hashtableCreate(default_hashtable_size, NULL);
+THash *_hash_nodes = (THash *)calloc(default_hashtable_size, sizeof(THash));
 
+void LoadHashTable(const FileNode &fn)
+{
+    int hash_table_size;
+    fn["hash_table_size"] >> hash_table_size;   
+
+    hashtableResize(_hash_table, hash_table_size);
+    realloc(_hash_nodes, hash_table_size);
+
+    FileNode fn_nodes = fn["hash_table_nodes"];
+
+    uint counter = 0;
+    int id, i, ppf_ind;
+    FileNode item;
+    THash *thash_item;
+    std::cout << "Hashtable initialized, starting Deserialization" << std::endl;
+    std::cout << "length " << fn_nodes.end()-fn_nodes.begin() << std::endl;
+    size_t size_fn_nodes = fn_nodes.size();
+    
+    for (FileNodeIterator it = fn_nodes.begin(); it != fn_nodes.end(); it++)
+    {
+        std::cout << "\r[Deserialization] Processing: " << (counter+1) << "/" << hash_table_size;
+        item = *it;
+        // item = fn_nodes[it];
+
+        item["id"] >> id;
+        item["i"] >> i;
+        item["ppfInd"] >> ppf_ind;
+
+        thash_item = &_hash_nodes[counter];
+        thash_item->id = id;
+        thash_item->i = i;
+        thash_item->ppfInd = ppf_ind;
+
+        hashtableInsertHashed(_hash_table, id, (void *)thash_item);
+
+        counter++;
+    }
+    std::cout << std::endl;
+}
 void posePublish (Pose3D pose, ros::Publisher publisher)
 {
     // publish object pose informs of geometry_msgs pose
@@ -218,10 +263,17 @@ int main(int argc, char** argv)
     
     // YOLO global configuration
     yolo_detector.LoadClassNames(classesFile);
+
+    // Load Detector Hashtable
+    FileStorage fsload(TrainedDetectorFile, FileStorage::READ);
+    LoadHashTable(fsload.root());
+    fsload.release();
     // PPF global configuration
     Mat bottle = ppf_match_3d::loadPLYSimple(modelFile.c_str(), 1);
     ppf_processor.LoadSingleModel(bottle, "bottle");
-    ppf_processor.LoadTrainedDetector("bottle", PPFDetectorFile);
+    // ppf_processor.TrainDetector(TrainedDetectorFile, false, 0.025, 0.05);
+    ppf_processor.TrainSingleDetector("bottle", 0.025, 0.05);
+    // ppf_processor.LoadTrainedDetector("bottle", PPFDetectorFile);
     // ROS init and configuartion
     ros::init(argc, argv, "Azure_YOLO_PPF");
     ros::NodeHandle nh;

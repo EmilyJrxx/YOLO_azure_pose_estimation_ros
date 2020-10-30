@@ -107,7 +107,7 @@ class aubo_vision_pick(object):
         ready_pose.position.y = -0.1438
         ### fixed value! DO NOT CHANGE! 
         ######################################
-        ready_pose.position.z = 0.635        # bi position  budong
+        ready_pose.position.z = 0.625        # bi position  budong
         ready_pose.orientation.x = 0.7109
         ready_pose.orientation.y = -0.7031
         ready_pose.orientation.z = 0.0

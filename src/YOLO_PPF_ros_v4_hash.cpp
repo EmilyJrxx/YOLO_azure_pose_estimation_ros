@@ -16,6 +16,7 @@
 # include <opencv4/opencv2/core/eigen.hpp>
 # include <opencv4/opencv2/core.hpp>
 # include <opencv4/opencv2/highgui/highgui.hpp>
+# include <opencv4/opencv2/surface_matching/t_hash_int.hpp>
 # include <cv_bridge/cv_bridge.h>
 
 # include <pcl/point_types.h>
@@ -50,15 +51,16 @@ const double nmsThreshold = 0.4;
 const string modelConfiguration = "/home/xxwang/Packages/darknet/cfg/yolov3.cfg";
 const string modelWeights = "/home/xxwang/Packages/darknet/yolov3.weights";
 const string classesFile = "/home/xxwang/Packages/darknet/data/coco.names";
-const string modelFile = "/home/xxwang/Workspaces/YOLO_PPF_Pose_Estimation/data/bluemoon_1/or1.2_mls15_meter.ply";
+const string modelFile = "/home/xxwang/Workspaces/YOLO_PPF_Pose_Estimation/data/bluemoon_1/or1.2_mls15_remesh_3.0_meter.ply";
 const string PPFDetectorFile = "/home/xxwang/Workspaces/YOLO_PPF_Pose_Estimation/src/detector_bluemoon_bottle.xml";
+const string TrainedDetectorFile = "/home/xxwang/Workspaces/YOLO_PPF_Pose_Estimation/src/detector_bluemoon_bottle_remesh.xml";
 // PPF parameters
 double relativeSamplingStep = 0.025;
 double relativeDistanceStep = 0.05;
 // Camera Parameters
 // Detectors Announcement
 yolo::YOLODetector yolo_detector (modelConfiguration, modelWeights);
-ppf::CloudProcessor ppf_processor (relativeSamplingStep, relativeDistanceStep); // here in the constructor the detector is not initialized
+ppf::CloudProcessor ppf_processor (relativeSamplingStep, relativeDistanceStep);
 
 string demand_object_name = "bottle";
 Mat CameraInfo_mat;
@@ -221,7 +223,9 @@ int main(int argc, char** argv)
     // PPF global configuration
     Mat bottle = ppf_match_3d::loadPLYSimple(modelFile.c_str(), 1);
     ppf_processor.LoadSingleModel(bottle, "bottle");
-    ppf_processor.LoadTrainedDetector("bottle", PPFDetectorFile);
+    // ppf_processor.TrainDetector(TrainedDetectorFile, false, 0.025, 0.05);
+    ppf_processor.TrainSingleDetector("bottle", 0.025, 0.05);
+    // ppf_processor.LoadTrainedDetector("bottle", PPFDetectorFile);
     // ROS init and configuartion
     ros::init(argc, argv, "Azure_YOLO_PPF");
     ros::NodeHandle nh;

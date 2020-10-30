@@ -87,6 +87,7 @@ namespace ppf
             }
             ~CloudProcessor(){
                 for (uint32_t i = 0; i < detectors.size(); i++){
+                    cout << "[!Warning!] destructing detector " << i << endl;
                     detectors[i].~PPF3DDetector();
                 }
             }
@@ -100,6 +101,8 @@ namespace ppf
             void LoadModels(vector<Mat>& models, vector<string> labels);
             void LoadSingleModel(Mat model, string label);
             void TrainDetector(const string TrainedDetectorDir, bool saveflag, const double relativeSamplingSetp, 
+                const double relativeDistanceStep); // train a new detector
+            void TrainSingleDetector(const string modelname, const double relativeSamplingSetp, 
                 const double relativeDistanceStep); // train a new detector
             void Deprojection(Mat CameraIntr);
             vector<PointCloud<PointXYZ> > SceneCropping(Mat CameraIntr);
@@ -218,11 +221,15 @@ namespace ppf
     }
     void CloudProcessor::LoadSingleModel(Mat model_input, string label)
     {
+        cout << "Loading single model " << endl;
+        cout << "models size: " << models.size() << endl;
+        // models.clear(); // debug
         models.push_back(model_input);
         int id = models.size() - 1;
         if_trained.push_back(false);
         label_to_id[label] = id;
         id_to_label[id] = label;
+        cout << label << ": " << id << endl; 
 
         ppf_match_3d::PPF3DDetector detector(relativeSamplingStep, relativeDistanceStep);
         detectors.push_back(detector); 
@@ -248,6 +255,7 @@ namespace ppf
                 double training_time = (double)(tick2 - tick1) / getTickFrequency();
                 cout << training_time << "sec" << endl;
                 detectors[i] = detector;
+                if_trained[i] = true;
 
                 if (saveflag == true)
                 {
@@ -268,6 +276,24 @@ namespace ppf
                     }
                 }
             }
+    }
+    void CloudProcessor::TrainSingleDetector(const string modelname, const double relativeSamplingStep = 0.025, 
+                    const double relativeDistanceStep = 0.05)
+    {
+        cout << "Detectors num: " << detectors.size() << endl; 
+        int id = label_to_id[modelname];
+        Mat model = models[id];
+        cout << "Training the "<< modelname <<" model in: ";
+        ppf_match_3d::PPF3DDetector detector(relativeSamplingStep, relativeDistanceStep);
+        int64 tick1 = getTickCount();
+        detectors[id].trainModel(model);
+        // detector.trainModel(model);
+        int64 tick2 = getTickCount();
+        double training_time = (double)(tick2 - tick1) / getTickFrequency();
+        cout << training_time << "sec" << endl;
+        // detectors.push_back(detector);
+        if_trained[id] = true;
+        cout << "Recheck: Detectors num: " << detectors.size() << endl;
     }
     void CloudProcessor::Deprojection(Mat CameraIntr){}
     vector<PointCloud<PointXYZ> > CloudProcessor::SceneCropping(const Mat CameraIntr)
@@ -501,7 +527,7 @@ namespace ppf
         
         // TODO: Pose Validation
     }
-    Pose3D CloudProcessor::Matching_S2B(const string name, Mat scene, Mat edge, double relativeSceneSampleStep = 0.033, 
+    Pose3D CloudProcessor::Matching_S2B(const string name, Mat scene, Mat edge, double relativeSceneSampleStep = 0.0714, 
                                   double relativeSceneDistance = 0.08)
     {
         cout << "detectors num: " << detectors.size() << endl;
