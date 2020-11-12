@@ -124,37 +124,23 @@ class aubo_vision_pick(object):
         pose_goal=geometry_msgs.msg.Pose()
 
         # define pose with specific parameters
-        # pose_goal.position.x = -0.249004
-        # pose_goal.position.y = -0.292347
-        # pose_goal.position.z = 0.697158
-        # pose_goal.orientation.x = -0.84184
-        # pose_goal.orientation.y = -0.53862
-        # pose_goal.orientation.z = 0.002209
-        # pose_goal.orientation.w = 0.008829
-        pose_goal.position.x = -0.5
-        pose_goal.position.y = -0.177
-        pose_goal.position.z = 0.58
-        pose_goal.orientation.x = 0.707106781
-        pose_goal.orientation.y = -0.707106781
-        pose_goal.orientation.z = -4.32978028e-17
-        pose_goal.orientation.w = 4.32978028e-17
-        # default_joint_states = group.get_current_joint_values()
-        # default_joint_states[0] = -1.089   / 180 * math.pi
-        # default_joint_states[1] = 63.66 / 180 * math.pi
-        # default_joint_states[2] = -61.01 / 180 * math.pi
-        # default_joint_states[3] = -39.04  / 180 * math.pi
-        # default_joint_states[4] = -94.08 / 180 * math.pi
-        # default_joint_states[5] = 1.5079   / 180 * math.pi
+        pose_goal.position.x = -0.249004
+        pose_goal.position.y = -0.292347
+        pose_goal.position.z = 0.697158
+        pose_goal.orientation.x = -0.84184
+        pose_goal.orientation.y = -0.53862
+        pose_goal.orientation.z = 0.002209
+        pose_goal.orientation.w = 0.008829
         
         group.set_pose_target(pose_goal)
         plan = group.go(wait=True)
-        # group.go(default_joint_states, wait=True)
         # group.stop()
         group.clear_pose_targets()
         current_pose=group.get_current_pose().pose
         print("New current pose: ", current_pose)
         return all_close(pose_goal, current_pose, 0.01)
         
+	# Point A is 0.2m lower than Pre_Point A 
     def go_to_pointA(self):
         group = self.group
         current_pose = group.get_current_pose().pose
@@ -171,14 +157,13 @@ class aubo_vision_pick(object):
         pose_goal.orientation.w = 0.008829
         
         group.set_pose_target(pose_goal)
-        plan = group.plan()
-        group.go(wait=True)
+        plan = group.go(wait=True)
         # group.stop()
         group.clear_pose_targets()
         current_pose=group.get_current_pose().pose
-        print("Target pose: ", pose_goal)
         print("New current pose: ", current_pose)
-        return all_close(pose_goal, current_pose, 0.01)
+        return all_close(pose_goal, current_pose, 0.01)        
+	# Point A is 0.2m lower than Pre_Point A 
 
     def go_to_pre_pointB(self):
         group = self.group
@@ -202,7 +187,8 @@ class aubo_vision_pick(object):
         current_pose=group.get_current_pose().pose
         print("New current pose: ", current_pose)
         return all_close(pose_goal, current_pose, 0.01)
-
+        
+	# Point B is 0.2m lower than Pre_Point B 
     def go_to_pointB(self):
         group = self.group
         current_pose = group.get_current_pose().pose
@@ -224,7 +210,9 @@ class aubo_vision_pick(object):
         group.clear_pose_targets()
         current_pose=group.get_current_pose().pose
         print("New current pose: ", current_pose)
-        return all_close(pose_goal, current_pose, 0.01)
+        return all_close(pose_goal, current_pose, 0.01)        
+	# Point B is 0.2m lower than Pre_Point B 
+
 
     def init_2f_gripper(self):
         # rospy.init_node('Robotiq2FGripper')
@@ -238,19 +226,20 @@ class aubo_vision_pick(object):
         self.gripper_command.rGTO = 1
         self.gripper_command.rSP  = 255
         self.gripper_command.rFR  = 150
-        self.gripper_pub.publish(self.gripper_command)
         rospy.sleep(0.1)
 
     def gripper_open(self):
         self.gripper_command.rPR = 0
         self.gripper_pub.publish(self.gripper_command)
         rospy.sleep(0.1)
-
+	
+	# The corresponding highest value is 255
     def gripper_close(self):
         self.gripper_command.rPR = 255
-        self.gripper_command.rFR = 25
         self.gripper_pub.publish(self.gripper_command)
         rospy.sleep(0.1)
+	
+	# The corresponding highest value is 255
 
 if __name__=="__main__":
 
@@ -264,23 +253,30 @@ if __name__=="__main__":
     print "==== Press `Enter` to go to position A ===="
     raw_input()
     aubo_move.go_to_pre_pointA()
+    aubo_move.go_to_pointA()
     aubo_move.gripper_close()
-    # aubo_move.go_to_pointA()
-    # aubo_move.gripper_close()
-    # aubo_move.go_to_pre_pointA()
+    aubo_move.go_to_pre_pointA()
 
-    # print "==== Press `Enter` to go to position B ===="
-    # raw_input()
-    # aubo_move.go_to_pre_pointB()
-    # aubo_move.go_to_pointB()
-    # aubo_move.gripper_open()
+    print "==== Press `Enter` to go to position B ===="
+    raw_input()
+    aubo_move.go_to_pre_pointB()
+    aubo_move.go_to_pointB()
+    aubo_move.gripper_open()
+    aubo_move.go_to_pre_pointB()
 
-    # rospy.sleep(3)
+    aubo_move.go_to_pointB()
+    aubo_move.gripper_close()
+    aubo_move.go_to_pre_pointB()
 
-    # aubo_move.gripper_close()
-    # aubo_move.go_to_pre_pointB()
-    # aubo_move.go_to_pre_pointA()
-    # aubo_move.go_to_pointA()
-    # aubo_move.gripper_open()
+    print "==== Press `Enter` to go to position A ===="
+    raw_input()
+    aubo_move.go_to_pre_pointA()
+    aubo_move.go_to_pointA()
+    aubo_move.gripper_open()
+    aubo_move.go_to_pre_pointA()
 
-    # aubo_move.go_to_ready_pose()
+	#wait for subsequent commands
+    rospy.sleep(3)
+
+	#move to the original position
+    aubo_move.go_to_ready_pose()

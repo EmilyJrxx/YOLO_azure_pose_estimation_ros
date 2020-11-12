@@ -370,6 +370,8 @@ namespace ppf
             bb_filter.setHullCloud(surface_hull);
             bb_filter.filter(*cropped);
 
+            if (cropped->size() == 0)
+                continue;
             io::savePLYFileASCII("surface_hull.ply", *surface_hull);
             io::savePLYFileASCII("cropped_cloud.ply", *cropped);
             printf("Cropping : %d / %d \n", scene_tmp->size(), cropped->size());

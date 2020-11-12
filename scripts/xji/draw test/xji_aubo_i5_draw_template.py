@@ -3,6 +3,7 @@
 import sys, rospy, tf, moveit_commander, math, moveit_msgs.msg
 import tf2_ros, tf2_geometry_msgs
 import numpy as np
+import copy
 
 from sensor_msgs.msg import Image
 from geometry_msgs.msg import *
@@ -18,6 +19,60 @@ from time import sleep
 import roslib; roslib.load_manifest('robotiq_2f_gripper_control')
 from robotiq_2f_gripper_control.msg import _Robotiq2FGripper_robot_output  as outputMsg
 
+from DrawManyTurtle.py import rob_x,rob_y
+
+import turtle as tl
+import math
+
+def DrawManyTurtle():
+    data = []
+    points = 5000  # 不同精度的图片绘制点数不同
+
+    N = 1000 + 1  # N由上个程序中计算出的级数数量决定，加1是因为有一个角速度为0的量（直流分量）
+    x = [0] * N
+    y = [0] * N
+    rob_x = [0] * 5000
+    rob_y = [0] * 5000
+    rob_x_min = 0
+    rob_x_max = 0
+    rob_y_min = 0
+    rob_y_max = 0
+    f = open("datas0" + ".txt", "r")
+    tl.penup()
+    tl.pensize(2)  # 画笔粗细
+    for line in f:
+        line = eval(line)
+        data.append(line)
+
+        # tl.setup(960,720)
+
+        # 储存原始代码的电脑因新型肺炎疫情被隔离了，这是我根据印象重新做的，可能存在错误，疫情结束后会更正。
+        # 三角函数中的值是n * 2 * pi * t , 其中n取0，1，-1，2，-2……，t的范围是[0,1]，当然t取大了没关系，会重复描已经画好的图形
+    for t in range(points):
+        for i in range(len(data)):
+            if i % 2 == 0:
+                x[i] = data[i][0] * math.cos(i / points * 3.14 * t) - data[i][1] * math.sin(i / points * 3.14 * t)
+                y[i] = data[i][0] * math.sin(i / points * 3.14 * t) + data[i][1] * math.cos(i / points * 3.14 * t)
+            else:
+                x[i] = data[i][0] * math.cos(-(i + 1) / points * 3.14 * t) - data[i][1] * math.sin(
+                    -(i + 1) / points * 3.14 * t)
+                y[i] = data[i][0] * math.sin(-(i + 1) / points * 3.14 * t) + data[i][1] * math.cos(
+                    -(i + 1) / points * 3.14 * t)
+
+        rob_x[t] = sum(x) / 3750
+        rob_y[t] = sum(y) / 3750
+        print("rob_x[(%d)]= %f" % (t, rob_x[t]))
+        print("rob_y[(%d)]= %f" % (t, rob_y[t]))
+        if rob_x_max < rob_x[t]:
+            rob_x_max = rob_x[t]
+        if rob_x_min > rob_x[t]:
+            rob_x_min = rob_x[t]
+        if rob_y_max < rob_y[t]:
+            rob_y_max = rob_y[t]
+        if rob_y_min > rob_y[t]:
+            rob_y_min = rob_y[t]
+        tl.goto(int(sum(x)) / 2, -int(sum(y) / 2))  # 正负可以控制图形的左右镜像，上下镜像,乘除可以控制缩放
+        tl.pendown()
 
 def nothing(x):
     pass
@@ -76,9 +131,11 @@ class aubo_vision_pick(object):
         print robot.get_current_state()
 
         # Allow some leeway in position (meters) and orientation (radians)
+        # #设置位置（单位：米）和姿态（单位弧度）的允许最大误差
         group.set_goal_position_tolerance(0.001)
         group.set_goal_orientation_tolerance(0.01)
         group.set_planning_time(0.1)
+        # #设置允许的最大加速度和最大速度
         group.set_max_acceleration_scaling_factor(.5)
         group.set_max_velocity_scaling_factor(.8)
 
@@ -97,103 +154,45 @@ class aubo_vision_pick(object):
         rate = rospy.Rate(10)
 
     def go_to_ready_pose(self):
+
         group = self.group
         default_joint_states = group.get_current_joint_values()
         print(type(default_joint_states), default_joint_states)
 
-        # define ready pose with specific joint value
-        default_joint_states[0] = 2.3938   / 180 * math.pi
-        default_joint_states[1] = -17.7986 / 180 * math.pi
-        default_joint_states[2] = -95.4710 / 180 * math.pi
-        default_joint_states[3] = -5.4654  / 180 * math.pi
-        default_joint_states[4] = -94.8020 / 180 * math.pi
-        default_joint_states[5] = 1.7620   / 180 * math.pi
-        
-        group.go(default_joint_states, wait=True)
-        # group.stop()
-        rospy.sleep(1)
-        current_joints = group.get_current_joint_values()
-        current_pose = self.group.get_current_pose().pose
-        print("current pose:", current_pose)
-        return all_close(default_joint_states, current_joints, 0.01)
-
-    def go_to_pre_pointA(self):
-        group = self.group
-        current_pose = group.get_current_pose().pose
-        print("Current pose: ", current_pose)
-        pose_goal=geometry_msgs.msg.Pose()
-
-        # define pose with specific parameters
-        # pose_goal.position.x = -0.249004
-        # pose_goal.position.y = -0.292347
-        # pose_goal.position.z = 0.697158
-        # pose_goal.orientation.x = -0.84184
-        # pose_goal.orientation.y = -0.53862
-        # pose_goal.orientation.z = 0.002209
-        # pose_goal.orientation.w = 0.008829
-        pose_goal.position.x = -0.5
-        pose_goal.position.y = -0.177
-        pose_goal.position.z = 0.58
-        pose_goal.orientation.x = 0.707106781
-        pose_goal.orientation.y = -0.707106781
-        pose_goal.orientation.z = -4.32978028e-17
-        pose_goal.orientation.w = 4.32978028e-17
-        # default_joint_states = group.get_current_joint_values()
-        # default_joint_states[0] = -1.089   / 180 * math.pi
-        # default_joint_states[1] = 63.66 / 180 * math.pi
-        # default_joint_states[2] = -61.01 / 180 * math.pi
-        # default_joint_states[3] = -39.04  / 180 * math.pi
-        # default_joint_states[4] = -94.08 / 180 * math.pi
-        # default_joint_states[5] = 1.5079   / 180 * math.pi
-        
-        group.set_pose_target(pose_goal)
-        plan = group.go(wait=True)
-        # group.go(default_joint_states, wait=True)
-        # group.stop()
-        group.clear_pose_targets()
-        current_pose=group.get_current_pose().pose
-        print("New current pose: ", current_pose)
-        return all_close(pose_goal, current_pose, 0.01)
-        
-    def go_to_pointA(self):
-        group = self.group
-        current_pose = group.get_current_pose().pose
-        print("Current pose: ", current_pose)
-        pose_goal=geometry_msgs.msg.Pose()
-
-        # define pose with specific parameters
-        pose_goal.position.x = -0.249004
-        pose_goal.position.y = -0.292347
-        pose_goal.position.z = 0.497158
-        pose_goal.orientation.x = -0.84184
-        pose_goal.orientation.y = -0.53862
-        pose_goal.orientation.z = 0.002209
-        pose_goal.orientation.w = 0.008829
-        
-        group.set_pose_target(pose_goal)
-        plan = group.plan()
+	### Specify Ready Pose Configuration:
+        ready_pose=geometry_msgs.msg.Pose()
+        ready_pose.position.x = -0.4612
+        ready_pose.position.y = -0.1438
+        ### fixed value! DO NOT CHANGE! 
+        ######################################
+        ready_pose.position.z = 0.635 
+        ready_pose.orientation.x = 0.7109
+        ready_pose.orientation.y = -0.7031
+        ready_pose.orientation.z = 0.0
+        ready_pose.orientation.w = 0.0
+        ######################################
+	
+	### Execution:
+        group.set_pose_target(ready_pose)
         group.go(wait=True)
         # group.stop()
-        group.clear_pose_targets()
-        current_pose=group.get_current_pose().pose
-        print("Target pose: ", pose_goal)
-        print("New current pose: ", current_pose)
-        return all_close(pose_goal, current_pose, 0.01)
+        rospy.sleep(1)
 
-    def go_to_pre_pointB(self):
+	### Status Check
+        current_joints = group.get_current_joint_values()
+        current_pose = self.group.get_current_pose().pose
+	    print("current pose:", current_pose)
+
+        return all_close(default_joint_states, current_joints, 0.01)
+
+    def lift_up(self):
         group = self.group
         current_pose = group.get_current_pose().pose
-        print("Current pose: ", current_pose)
         pose_goal=geometry_msgs.msg.Pose()
 
         # define pose with specific parameters
-        pose_goal.position.x = -0.630134
-        pose_goal.position.y = 0.267557
-        pose_goal.position.z = 0.696061
-        pose_goal.orientation.x = 0.991906
-        pose_goal.orientation.y = -0.121169
-        pose_goal.orientation.z = 0.0156649
-        pose_goal.orientation.w = 0.0345585
+        pose_goal = current_pose
+        pose_goal.position.z += 0.1
         
         group.set_pose_target(pose_goal)
         plan = group.go(wait=True)
@@ -203,20 +202,15 @@ class aubo_vision_pick(object):
         print("New current pose: ", current_pose)
         return all_close(pose_goal, current_pose, 0.01)
 
-    def go_to_pointB(self):
+        # Similar to <lift_up>
+    def put_down(self):
         group = self.group
         current_pose = group.get_current_pose().pose
-        print("Current pose: ", current_pose)
         pose_goal=geometry_msgs.msg.Pose()
 
         # define pose with specific parameters
-        pose_goal.position.x = -0.630134
-        pose_goal.position.y = 0.267557
-        pose_goal.position.z = 0.496061
-        pose_goal.orientation.x = 0.991906
-        pose_goal.orientation.y = -0.121169
-        pose_goal.orientation.z = 0.0156649
-        pose_goal.orientation.w = 0.0345585
+        pose_goal = current_pose
+        pose_goal.position.z -= 0.1
         
         group.set_pose_target(pose_goal)
         plan = group.go(wait=True)
@@ -225,32 +219,70 @@ class aubo_vision_pick(object):
         current_pose=group.get_current_pose().pose
         print("New current pose: ", current_pose)
         return all_close(pose_goal, current_pose, 0.01)
+	######################
+	# Your code here 
+	######################
 
-    def init_2f_gripper(self):
-        # rospy.init_node('Robotiq2FGripper')
-        self.gripper_pub = rospy.Publisher('Robotiq2FGripperRobotOutput', outputMsg.Robotiq2FGripper_robot_output)
-        self.gripper_command = outputMsg.Robotiq2FGripper_robot_output();
-        # gripper reset
-        self.gripper_command.rACT = 0
-        # gripper activate
-        self.gripper_command = outputMsg.Robotiq2FGripper_robot_output();
-        self.gripper_command.rACT = 1
-        self.gripper_command.rGTO = 1
-        self.gripper_command.rSP  = 255
-        self.gripper_command.rFR  = 150
-        self.gripper_pub.publish(self.gripper_command)
-        rospy.sleep(0.1)
+        # Similar to <lift_up>
+    def goto_next(self, scale):
+        group = self.group
+        current_pose = group.get_current_pose().pose
+        pose_goal=geometry_msgs.msg.Pose()
 
-    def gripper_open(self):
-        self.gripper_command.rPR = 0
-        self.gripper_pub.publish(self.gripper_command)
-        rospy.sleep(0.1)
+        # define pose with specific parameters
+        pose_goal = current_pose
+        pose_goal.position.y += scale*0.075
+        
+        group.set_pose_target(pose_goal)
+        plan = group.go(wait=True)
+        # group.stop()
+        group.clear_pose_targets()
+        current_pose=group.get_current_pose().pose
+        print("New current pose: ", current_pose)
+        return all_close(pose_goal, current_pose, 0.01)
+	######################
+	# Your code here 
+	######################
 
-    def gripper_close(self):
-        self.gripper_command.rPR = 255
-        self.gripper_command.rFR = 25
-        self.gripper_pub.publish(self.gripper_command)
-        rospy.sleep(0.1)
+        #change of position.z should be fixed as 0.03
+
+    def draw_fourier(self, scale):
+        DrawManyTurtle()
+        waypoints = []
+
+        group = self.group
+        start_pose = group.get_current_pose().pose
+        print("Current pose: ", start_pose)
+
+        self.put_down()
+        # the first stroke
+        wpose = group.get_current_pose().pose
+        for t in range(5000):
+            wpose.position.x += rob_x[t]
+            wpose.position.y += rob_y[t]
+            waypoints.append(copy.deepcopy(wpose))
+
+        (plan, fraction) = group.compute_cartesian_path(
+            waypoints,
+            0.01,
+            0.0
+        )
+        group.execute(plan, wait=True)
+
+        group.clear_pose_targets()
+        current_pose=group.get_current_pose().pose
+        print("New current pose: ", current_pose)
+
+        group.set_pose_target(start_pose)
+        group.go(wait=True)
+        group.clear_pose_targets()
+        current_pose=group.get_current_pose().pose
+        print("New current pose: ", current_pose)
+
+	######################
+	# Your code here 
+	######################
+
 
 if __name__=="__main__":
 
@@ -259,28 +291,15 @@ if __name__=="__main__":
     print "==== Press `Enter` to go to ready pose ===="
     raw_input()
     aubo_move.go_to_ready_pose()
-    aubo_move.init_2f_gripper()
 
-    print "==== Press `Enter` to go to position A ===="
-    raw_input()
-    aubo_move.go_to_pre_pointA()
-    aubo_move.gripper_close()
-    # aubo_move.go_to_pointA()
-    # aubo_move.gripper_close()
-    # aubo_move.go_to_pre_pointA()
+    scale = 0.5
 
-    # print "==== Press `Enter` to go to position B ===="
+    print "==== Press `Enter` to write F ===="
+    # raw_input() is one way you can test your patterns respectively
+    aubo_move.draw_fourier(scale)
+
+    print "==== Press `Enter` to write haha ===="
     # raw_input()
-    # aubo_move.go_to_pre_pointB()
-    # aubo_move.go_to_pointB()
-    # aubo_move.gripper_open()
+    aubo_move.goto_next(scale)
 
-    # rospy.sleep(3)
-
-    # aubo_move.gripper_close()
-    # aubo_move.go_to_pre_pointB()
-    # aubo_move.go_to_pre_pointA()
-    # aubo_move.go_to_pointA()
-    # aubo_move.gripper_open()
-
-    # aubo_move.go_to_ready_pose()
+    # and D, A & N

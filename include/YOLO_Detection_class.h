@@ -41,12 +41,12 @@ namespace yolo
             bool if_detected;
             bool if_postprocessed;
             Net net;
-
         public:
+            bool skipping;
             YOLODetector(const string modelConfiguration, const string modelWeights){
                 net = readNetFromDarknet(modelConfiguration, modelWeights);
-                net.setPreferableBackend(DNN_BACKEND_OPENCV);
-                net.setPreferableTarget(DNN_TARGET_CPU);
+                net.setPreferableBackend(DNN_BACKEND_CUDA);
+                net.setPreferableTarget(DNN_TARGET_CUDA);
                 cout << "YOLO network configured. " << endl; 
                 boxes.resize(1);
                 classIds.resize(1);
@@ -54,6 +54,7 @@ namespace yolo
                 confidences.resize(1);
                 if_detected = false;
                 if_postprocessed = false;
+                skipping = false;
             }
             YOLODetector(const string modelConfiguration, const string modelWeights, 
                 Mat rgb_input, Mat depth_input){
@@ -74,6 +75,7 @@ namespace yolo
                 if_detected = false;
                 if_postprocessed = false;
                 
+                skipping = false;
 
                 cout << "RGB and depth images inputed" << endl;
             }
@@ -186,6 +188,8 @@ namespace yolo
         cout << "Postprocess: pre-check." << endl; // debug
         Mat frame = rgb_img;
         // cout << "Processing on " << k << endl;
+
+        bool skipping_flag = false;
         for (size_t i = 0; i < outs.size(); i++)
         {
             // Scan through all the bounding boxes output from the network and 
@@ -224,12 +228,26 @@ namespace yolo
                 }            
             }      
             cout << " results size: " << classIds.size() << endl;
+            if (classIds.size() == 0)
+            {
+                cerr << "No results higher than conf-thresh found ! Skipping." << endl;
+                skipping_flag = true;
+                continue;
+            }
+            else{
+                skipping_flag = false;
+            }
             cout << "Processing NMS" << endl;
             dnn::NMSBoxes(boxes, confidences, confThreshold, nmsThreshold, indices);            
         }
-
-        if_postprocessed = 1;
-        return 0;
+        
+        if (skipping_flag){
+            return 1;
+        }
+        else{
+            if_postprocessed = 1;
+            return 0;
+        }
     }
     int YOLODetector::display(){
         // Pre-Check

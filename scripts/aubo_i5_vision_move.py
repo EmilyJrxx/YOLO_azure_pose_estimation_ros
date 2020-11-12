@@ -3,10 +3,13 @@
 import sys, rospy, tf, moveit_commander, math, moveit_msgs.msg
 import tf2_ros, tf2_geometry_msgs
 import numpy as np
+import copy
 
 from sensor_msgs.msg import Image
 from geometry_msgs.msg import *
 from geometry_msgs.msg import Pose
+from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseStampedNamed
 from moveit_commander.conversions import pose_to_list
 from tf.transformations import quaternion_from_euler
 from moveit_python import PlanningSceneInterface
@@ -82,8 +85,8 @@ class aubo_vision_pick(object):
         group.set_goal_position_tolerance(0.001)
         group.set_goal_orientation_tolerance(0.01)
         group.set_planning_time(0.1)
-        group.set_max_acceleration_scaling_factor(.5)
-        group.set_max_velocity_scaling_factor(.8)
+        group.set_max_acceleration_scaling_factor(0.5)
+        group.set_max_velocity_scaling_factor(0.5)
 
         self.robot = robot
         self.scene = scene
@@ -94,33 +97,87 @@ class aubo_vision_pick(object):
         self.group_names = group_names
         self.track_flag = False
         self.default_pose_flag = True
-
+        self.grasp_ongoing = False
+        
         self.target_point = PointStamped()
         # Subscribe to recognition results
         
-        self.pose_sub = rospy.Subscriber(obj_pose_topic, Pose, self.obj_pose_callback, queue_size = 1)
+        self.pose_sub = rospy.Subscriber(obj_pose_topic, PoseStampedNamed, self.obj_pose_callback, queue_size = 1)
         # queue_size = 1, no remaining task for the sake of safety
         self.tf_listener = tf.TransformListener()
         rate = rospy.Rate(10)
+        rospy.spin()
+
+        # self.go_to_ready_pose()
 
     def obj_pose_callback(self, msg):
         # geometry_msg pose from vision part
-        # self.obj_pose_camera = msg
-        print ("receiving pose: ", msg)
+        obj_pose_stamped = copy.deepcopy(msg.stamped_pose)
+        label = msg.label
+        if (self.grasp_ongoing == False):
+            self.obj_pose_camera = copy.deepcopy(obj_pose_stamped) # PoseStamped
+        else:
+            return
+        print ("============ Pose Receiving ===========")
+        print ("receiving pose: ", self.obj_pose_camera)
+        self.grasp_ongoing = True
         
-        # triggering test
-        # self.go_to_grasp_pose()
+        # pose converting
+        print ("============ Coordinate Converting ===========")
+        # raw_input()
+        rospy.sleep(0.5)
+        # self.go_to_ready_pose()
+        self.init_2f_gripper()
+        self.coordinate_convert()
+        # go to pre-grasp pose
+        print ("============ Go to pre-grasp pose ===========")
+        # raw_input()
+        rospy.sleep(0.5)
+        self.go_to_pre_grasp_pose()
+        # self.go_to_ready_pose()
+        # go to grasp pose
+        print ("============== Go to grasp pose =============")
+        raw_input()
+        rospy.sleep(0.5)
+        self.go_to_grasp_pose()
+        self.gripper_close()
+        self.go_to_exit_grasp_pose()
+        # self.go_to_ready_pose()
+        print ("============== Go to place pose =============")
+        # raw_input()
+        # rospy.sleep(0.5)
+        if (label == "apple"):
+            self.go_to_place_pose_A()
+        if (label == "orange"):
+            self.go_to_place_pose_B()
+        self.gripper_open()
+        self.go_to_ready_pose()
+
+        rospy.sleep(3.3)
+        self.grasp_ongoing = False
+        # Place
+        
+
     
     def coordinate_convert(self):
         # convert object pose from rgb_frame to robot_frame
-        listener = self.tf_listener
-        if listener.frameExists("base_link") and listener.frameExists("camera_rgb_link"):
-            # 'base_link' or 'world' depends on planning frame the system is using
-            listener.waitForTransform("base_link", "camera_rgb_link",
-                                      rospy.Time(0), rospy.Duration(4.0))
-            self.obj_pose_robot = listener.transformPoint("base_link", self.obj_pose_camera)
-            print ("position in robot frame:")
-            print (self.obj_pose_robot)
+        # if listener.frameExists("base_link") and listener.frameExists("camera_rgb_link"):
+        #     # 'base_link' or 'world' depends on planning frame the system is using
+        #     listener.waitForTransform("base_link", "camera_rgb_link",
+        #                               rospy.Time(0), rospy.Duration(4.0))
+        self.obj_pose_robot =self.tf_listener.transformPose("base_link", self.obj_pose_camera)
+        # self.obj_pose_robot.pose.position.y += 0.003
+        self.obj_pose_robot.pose.position.x += 0.007
+        self.obj_pose_robot.pose.orientation.x = 0.707106781
+        self.obj_pose_robot.pose.orientation.y = -0.707106781
+        self.obj_pose_robot.pose.orientation.z = -4.32978028e-17
+        self.obj_pose_robot.pose.orientation.w = 4.32978028e-17
+        self.obj_pose_robot.pose.position.z += 0.68
+
+
+        self.pose_refreshed = True
+        print ("position in robot frame:")
+        print (self.obj_pose_robot)
 
     def go_to_ready_pose(self):
         group = self.group
@@ -143,29 +200,149 @@ class aubo_vision_pick(object):
         print("current pose:", current_pose)
         return all_close(default_joint_states, current_joints, 0.01)
     
-    def go_to_grasp_pose(self):
+    def go_to_pre_grasp_pose(self):
+        if (self.pose_refreshed == False):
+            print ("pose not ready")
+            return
+
         group = self.group
-        current_pose = group.get_current_pose().pose
-        print("Current pose: ", current_pose)
+        # current_pose = group.get_current_pose().pose
+        # print("Current pose: ", current_pose)
         # define pose with specific parameters
 
-        joint_states = group.get_current_joint_values()
-        joint_states[0] = 2.311749   / 180 * math.pi
-        joint_states[1] = 36.436283 / 180 * math.pi
-        joint_states[2] = -124.610805 / 180 * math.pi
-        joint_states[3] = 21.985312  / 180 * math.pi
-        joint_states[4] = 92.997971 / 180 * math.pi
-        joint_states[5] = 1.75   / 180 * math.pi
-        
-        # group.set_pose_target(pose_goal)
-        plan = group.go(joint_states, wait=True)
+        pose_goal = copy.deepcopy(self.obj_pose_robot.pose)
+        pose_goal.position.z += 0.1
+        print("Pre-grasp pose: ", pose_goal)
+
+        group.set_pose_target(pose_goal)
+        plan = group.plan()
+        group.go(wait=True)
+
         # group.stop()
         group.clear_pose_targets()
         current_pose=group.get_current_pose().pose
         print("New current pose: ", current_pose)
+
+        # self.pose_refreshed = False
+        return all_close(pose_goal, current_pose, 0.01)
+    
+    def go_to_exit_grasp_pose(self):
+        if (self.pose_refreshed == False):
+            print ("pose not ready")
+            return
+
+        group = self.group
+        # current_pose = group.get_current_pose().pose
+        # print("Current pose: ", current_pose)
+        # define pose with specific parameters
+
+        pose_goal = copy.deepcopy(self.obj_pose_robot.pose) # ATTENTION: mind if obj_pose_robot changes during grasping
+        pose_goal.position.z += 0.3
+
+        group.set_pose_target(pose_goal)
+        plan = group.plan()
+        group.go(wait=True)
+
+        # group.stop()
+        group.clear_pose_targets()
+        current_pose=group.get_current_pose().pose
+        print("New current pose: ", current_pose)
+
+        self.pose_refreshed = False
         return all_close(pose_goal, current_pose, 0.01)
 
-        self.go_to_ready_pose()
+    def go_to_grasp_pose(self):
+        if (self.pose_refreshed == False):
+            print ("pose not ready")
+            return
+
+        group = self.group
+        # current_pose = group.get_current_pose().pose
+        # print("Current pose: ", current_pose)
+        # define pose with specific parameters
+
+        pose_goal = copy.deepcopy(self.obj_pose_robot.pose)
+        print("Grasp pose: ", pose_goal)
+
+        group.set_pose_target(pose_goal)
+        plan = group.plan()
+        group.go(wait=True)
+
+        # group.stop()
+        group.clear_pose_targets()
+        current_pose=group.get_current_pose().pose
+        print("New current pose: ", current_pose)
+
+        # self.pose_refreshed = False
+        return all_close(pose_goal, current_pose, 0.01)
+        
+    def go_to_place_pose_A(self):
+        # if (self.pose_refreshed == False):
+        #     print ("pose not ready")
+        #     return
+        print("Goto Apple")
+        group = self.group
+        # current_pose = group.get_current_pose().pose
+        # print("Current pose: ", current_pose)
+        # define pose with specific parameters
+
+        pose_goal=geometry_msgs.msg.Pose()
+        # pose_goal.position.x = -0.156
+        # pose_goal.position.y = 0.319
+        # pose_goal.position.z = 0.6
+        pose_goal.position.x = -0.48
+        pose_goal.position.y = -0.531
+        pose_goal.position.z = 0.46
+        pose_goal.orientation.x = 0.707106781
+        pose_goal.orientation.y = -0.707106781
+        pose_goal.orientation.z = -4.32978028e-17
+        pose_goal.orientation.w = 4.32978028e-17
+        print("Place pose: ", pose_goal)
+
+        group.set_pose_target(pose_goal)
+        plan = group.plan()
+        group.go(wait=True)
+
+        # group.stop()
+        group.clear_pose_targets()
+        current_pose=group.get_current_pose().pose
+        print("New current pose: ", current_pose)
+
+        # self.pose_refreshed = False
+        return all_close(pose_goal, current_pose, 0.01)
+
+        # self.go_to_ready_pose()
+    
+    def go_to_place_pose_B(self):
+        # if (self.pose_refreshed == False):
+        #     print ("pose not ready")
+        #     return
+        print("Goto Orange")
+        group = self.group
+
+        pose_goal=geometry_msgs.msg.Pose()
+        pose_goal.position.x = -0.69
+        pose_goal.position.y = -0.531
+        pose_goal.position.z = 0.46
+        pose_goal.orientation.x = 0.707106781
+        pose_goal.orientation.y = -0.707106781
+        pose_goal.orientation.z = -4.32978028e-17
+        pose_goal.orientation.w = 4.32978028e-17
+        print("Place pose: ", pose_goal)
+
+        group.set_pose_target(pose_goal)
+        plan = group.plan()
+        group.go(wait=True)
+
+        # group.stop()
+        group.clear_pose_targets()
+        current_pose=group.get_current_pose().pose
+        print("New current pose: ", current_pose)
+
+        # self.pose_refreshed = False
+        return all_close(pose_goal, current_pose, 0.01)
+
+        # self.go_to_ready_pose()
 
     def init_2f_gripper(self):
         # rospy.init_node('Robotiq2FGripper')
@@ -179,6 +356,7 @@ class aubo_vision_pick(object):
         self.gripper_command.rGTO = 1
         self.gripper_command.rSP  = 255
         self.gripper_command.rFR  = 150
+        self.gripper_pub.publish(self.gripper_command)
         rospy.sleep(0.1)
 
     def gripper_open(self):
@@ -188,13 +366,18 @@ class aubo_vision_pick(object):
 
     def gripper_close(self):
         self.gripper_command.rPR = 255
+        # self.gripper_command.rFR = 50
         self.gripper_pub.publish(self.gripper_command)
         rospy.sleep(0.1)
+    
+    def if_grasp_check(self):
+        if (self.gripper.command.rPR == 255):
+            print("Grasping failed")
 
 if __name__=="__main__":
 
     aubo_move = aubo_vision_pick()
-    
+    aubo_move.go_to_ready_pose()
     # print "==== Press `Enter` to go to ready pose ===="
     # raw_input()
     # aubo_move.go_to_ready_pose()

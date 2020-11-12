@@ -44,7 +44,6 @@ def all_close(goal, actual, tolerance):
     elif type(goal) is geometry_msgs.msg.Pose:
         return all_close(pose_to_list(goal), pose_to_list(actual), tolerance)
     return True
-
 class aubo_vision_pick(object):
     def __init__(self):
         super(aubo_vision_pick, self).__init__() # calling parent class
@@ -93,7 +92,7 @@ class aubo_vision_pick(object):
 
         self.target_point = PointStamped()
         # Subscribe to recognition results
-        rate = rospy.Rate(10)
+        rate = rospy.Rate(20)
 
     def go_to_ready_pose(self):
 
@@ -107,7 +106,7 @@ class aubo_vision_pick(object):
         ready_pose.position.y = -0.1438
         ### fixed value! DO NOT CHANGE! 
         ######################################
-        ready_pose.position.z = 0.625        # bi position  budong
+        ready_pose.position.z = 0.665        # bi position  budong
         ready_pose.orientation.x = 0.7109
         ready_pose.orientation.y = -0.7031
         ready_pose.orientation.z = 0.0
@@ -189,8 +188,6 @@ class aubo_vision_pick(object):
         print("Current pose: ", start_pose)
         self.put_down()
         # opcnCV
-        import cv2
-        import numpy as np
         img_path = "/home/xxwang/ROS_Workspaces/ros_k4a_auboi5_ws/src/azure_kinect_test/scripts/xty/Desktop/1.jpg"
         img = cv2.imread(img_path)
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -198,47 +195,40 @@ class aubo_vision_pick(object):
         image,contours, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
         contours = contours[1:]
         cv2.waitKey(0)
-        
+        ########
+
         my_list = [x / 5000.0 for x in contours]
-        count = 0
         wpose = group.get_current_pose().pose
-        wpose.position.z += 0.01
+        
+        wpose.position.z += 0.03
         waypoints.append(copy.deepcopy(wpose))
         for i in my_list:
-            count += 1
-            print("Drawing contour: {}".format(count))
-            
-            wpose.position.z -= 0.01
-            waypoints.append(copy.deepcopy(wpose))
+            Flag = False
             for j in i:
-                wpose.position.x = -0.4612 + scale * j[0][0] 
-                wpose.position.y = -0.1438 + scale * j[0][1]
+                wpose.position.x = -0.5112 + scale * j[0][0] 
+                wpose.position.y = +0.0638 - scale * j[0][1]
                 waypoints.append(copy.deepcopy(wpose))
-            wpose.position.z += 0.01
+                if Flag == False:
+                    wpose.position.z -= 0.03
+                    waypoints.append(copy.deepcopy(wpose))
+                    Flag = True
+            wpose.position.x = -0.5112 + scale * i[0][0][0] 
+            wpose.position.y = +0.0638 - scale * i[0][0][1]
             waypoints.append(copy.deepcopy(wpose))
-
-            (plan, fraction) = group.compute_cartesian_path(
-            waypoints,
-            0.01,
-            0.0
-            )
-            group.execute(plan, wait=True)
-            current_pose=group.get_current_pose().pose
-            print("New current pose: ", current_pose)
-            group.go(wait=True)
-            current_pose=group.get_current_pose().pose
-            print("New current pose: ", current_pose)
-        
-        
-        #group.clear_pose_targets()
+            wpose.position.z += 0.03
+            waypoints.append(copy.deepcopy(wpose))
+        (plan, fraction) = group.compute_cartesian_path(
+        waypoints,
+        0.01,
+        0.0
+        )
+        group.execute(plan, wait=True)
         current_pose=group.get_current_pose().pose
         print("New current pose: ", current_pose)
-        group.set_pose_target(start_pose)
-        group.go(wait=True)
-        group.clear_pose_targets()
-        current_pose=group.get_current_pose().pose
-        print("New current pose: ", current_pose)
-
+        #group.go(wait=True)
+        #current_pose=group.get_current_pose().pose
+        #print("New current pose: ", current_pose)
+        
 
 if __name__=="__main__":
 

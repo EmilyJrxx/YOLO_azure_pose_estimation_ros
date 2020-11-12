@@ -65,49 +65,49 @@ ppf::CloudProcessor ppf_processor (relativeSamplingStep, relativeDistanceStep);
 string demand_object_name = "bottle";
 Mat CameraInfo_mat;
 // global hash_table
-int default_hashtable_size = 100000;
-hashtable_int *_hash_table = hashtableCreate(default_hashtable_size, NULL);
-THash *_hash_nodes = (THash *)calloc(default_hashtable_size, sizeof(THash));
+// int default_hashtable_size = 100000;
+// hashtable_int *_hash_table = hashtableCreate(default_hashtable_size, NULL);
+// THash *_hash_nodes = (THash *)calloc(default_hashtable_size, sizeof(THash));
 
-void LoadHashTable(const FileNode &fn)
-{
-    int hash_table_size;
-    fn["hash_table_size"] >> hash_table_size;   
+// void LoadHashTable(const FileNode &fn)
+// {
+//     int hash_table_size;
+//     fn["hash_table_size"] >> hash_table_size;   
 
-    hashtableResize(_hash_table, hash_table_size);
-    realloc(_hash_nodes, hash_table_size);
+//     hashtableResize(_hash_table, hash_table_size);
+//     realloc(_hash_nodes, hash_table_size);
 
-    FileNode fn_nodes = fn["hash_table_nodes"];
+//     FileNode fn_nodes = fn["hash_table_nodes"];
 
-    uint counter = 0;
-    int id, i, ppf_ind;
-    FileNode item;
-    THash *thash_item;
-    std::cout << "Hashtable initialized, starting Deserialization" << std::endl;
-    std::cout << "length " << fn_nodes.end()-fn_nodes.begin() << std::endl;
-    size_t size_fn_nodes = fn_nodes.size();
+//     uint counter = 0;
+//     int id, i, ppf_ind;
+//     FileNode item;
+//     THash *thash_item;
+//     std::cout << "Hashtable initialized, starting Deserialization" << std::endl;
+//     std::cout << "length " << fn_nodes.end()-fn_nodes.begin() << std::endl;
+//     size_t size_fn_nodes = fn_nodes.size();
     
-    for (FileNodeIterator it = fn_nodes.begin(); it != fn_nodes.end(); it++)
-    {
-        std::cout << "\r[Deserialization] Processing: " << (counter+1) << "/" << hash_table_size;
-        item = *it;
-        // item = fn_nodes[it];
+//     for (FileNodeIterator it = fn_nodes.begin(); it != fn_nodes.end(); it++)
+//     {
+//         std::cout << "\r[Deserialization] Processing: " << (counter+1) << "/" << hash_table_size;
+//         item = *it;
+//         // item = fn_nodes[it];
 
-        item["id"] >> id;
-        item["i"] >> i;
-        item["ppfInd"] >> ppf_ind;
+//         item["id"] >> id;
+//         item["i"] >> i;
+//         item["ppfInd"] >> ppf_ind;
 
-        thash_item = &_hash_nodes[counter];
-        thash_item->id = id;
-        thash_item->i = i;
-        thash_item->ppfInd = ppf_ind;
+//         thash_item = &_hash_nodes[counter];
+//         thash_item->id = id;
+//         thash_item->i = i;
+//         thash_item->ppfInd = ppf_ind;
 
-        hashtableInsertHashed(_hash_table, id, (void *)thash_item);
+//         hashtableInsertHashed(_hash_table, id, (void *)thash_item);
 
-        counter++;
-    }
-    std::cout << std::endl;
-}
+//         counter++;
+//     }
+//     std::cout << std::endl;
+// }
 void posePublish (Pose3D pose, ros::Publisher publisher)
 {
     // publish object pose informs of geometry_msgs pose
@@ -265,9 +265,9 @@ int main(int argc, char** argv)
     yolo_detector.LoadClassNames(classesFile);
 
     // Load Detector Hashtable
-    FileStorage fsload(TrainedDetectorFile, FileStorage::READ);
-    LoadHashTable(fsload.root());
-    fsload.release();
+    // FileStorage fsload(TrainedDetectorFile, FileStorage::READ);
+    // LoadHashTable(fsload.root());
+    // fsload.release();
     // PPF global configuration
     Mat bottle = ppf_match_3d::loadPLYSimple(modelFile.c_str(), 1);
     ppf_processor.LoadSingleModel(bottle, "bottle");

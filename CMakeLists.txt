@@ -15,6 +15,7 @@ find_package(catkin REQUIRED COMPONENTS
   sensor_msgs
   std_msgs
   pcl_conversions
+  message_generation
 )
 find_package(Eigen3 REQUIRED)
 set(CMAKE_PREFIX_PATH /usr/local/include/)
@@ -58,8 +59,7 @@ message("PCL Found: " ${PCL_INCLUDE_DIRS})
 ## Generate messages in the 'msg' folder
 # add_message_files(
 #   FILES
-#   Message1.msg
-#   Message2.msg
+#   PoseStampedNamed.msg
 # )
 
 ## Generate services in the 'srv' folder
@@ -79,8 +79,9 @@ message("PCL Found: " ${PCL_INCLUDE_DIRS})
 ## Generate added messages and services with any dependencies listed here
 # generate_messages(
 #   DEPENDENCIES
-#   sensor_msgs#   std_msgs
-# )
+#   std_msgs
+#   geometry_msgs
+#)
 
 ################################################
 ## Declare ROS dynamic reconfigure parameters ##
@@ -114,7 +115,7 @@ message("PCL Found: " ${PCL_INCLUDE_DIRS})
 catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES azure_kinect_test
-#  CATKIN_DEPENDS cv_bridge message_filters roscpp sensor_msgs std_msgs
+#  CATKIN_DEPENDS cv_bridge message_filters roscpp sensor_msgs std_msgs geometry_msgs message_runtime
 #  DEPENDS system_lib
 )
 
@@ -165,11 +166,15 @@ add_executable(YOLO_PPF_recognition_train
 add_executable(${PROJECT_NAME}_YOLO_SAC
   src/YOLO_sac_ros.cpp
 )
+add_executable(${PROJECT_NAME}_YOLO_SAC_SPHERE
+  src/YOLO_sac_ros_sphere.cpp
+)
 target_compile_features(${PROJECT_NAME}_k4a_test PUBLIC cxx_std_17)
 target_compile_features(${PROJECT_NAME}_YOLO_test PUBLIC cxx_std_17)
 target_compile_features(${PROJECT_NAME}_k4a_record PUBLIC cxx_std_17)
 target_compile_features(${PROJECT_NAME}_YOLO_PPF_recognition PUBLIC cxx_std_17)
 target_compile_features(${PROJECT_NAME}_YOLO_SAC PUBLIC cxx_std_17)
+target_compile_features(${PROJECT_NAME}_YOLO_SAC_SPHERE PUBLIC cxx_std_17)
 target_compile_features(YOLO_PPF_recognition_train PUBLIC cxx_std_17)
 add_library(${PROJECT_NAME}_k4a_test_let
   src/k4a_test_ros.cpp
@@ -188,6 +193,9 @@ add_library(YOLO_PPF_recognition_train_let
 )
 add_library(${PROJECT_NAME}_YOLO_SAC_let
   src/YOLO_sac_ros.cpp
+)
+add_library(${PROJECT_NAME}_YOLO_SAC_SPHERE_let
+  src/YOLO_sac_ros_sphere.cpp 
 )
 target_link_libraries(${PROJECT_NAME}_k4a_test
   ${catkin_LIBRARIES}
@@ -250,6 +258,20 @@ target_link_libraries(${PROJECT_NAME}_YOLO_SAC
   ${PCL_LIBRARIES}
 )
 target_link_libraries(${PROJECT_NAME}_YOLO_SAC_let
+  ${catkin_LIBRARIES}
+  # ${Eigen3_LIBRARIES}
+  ${OpenCV_LIBRARIES}
+  ${Boost_LIBRARIES}
+  ${PCL_LIBRARIES}
+)
+target_link_libraries(${PROJECT_NAME}_YOLO_SAC_SPHERE
+  ${catkin_LIBRARIES}
+  # ${Eigen3_LIBRARIES}
+  ${OpenCV_LIBRARIES}
+  ${Boost_LIBRARIES}
+  ${PCL_LIBRARIES}
+)
+target_link_libraries(${PROJECT_NAME}_YOLO_SAC_SPHERE_let
   ${catkin_LIBRARIES}
   # ${Eigen3_LIBRARIES}
   ${OpenCV_LIBRARIES}
